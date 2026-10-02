@@ -28,12 +28,18 @@ def ensure_collection(recreate: bool = False):
 
 
 def search(query: str, k: int = config.TOP_K, core_only: bool = False) -> list[dict]:
-    dense = llm.embed([query], query=True)[0]
+    try:
+        dense = llm.embed([query], query=True, retry=False)[0]
+    except Exception as e:  # embedding quota gone: degrade to lexical-only search
+        print(f"  [retrieval] dense skipped: {e}", flush=True)
+        dense = None
     idx, vals = sparse_vector(query)
     flt = models.Filter(must=[models.FieldCondition(key="core", match=models.MatchValue(value=True))]) if core_only else None
-    prefetch = [models.Prefetch(query=dense, using="dense", limit=k * 4, filter=flt)]
+    prefetch = [models.Prefetch(query=dense, using="dense", limit=k * 4, filter=flt)] if dense else []
     if idx:
         prefetch.append(models.Prefetch(query=models.SparseVector(indices=idx, values=vals), using="sparse", limit=k * 4, filter=flt))
+    if not prefetch:
+        return []
     res = qdrant().query_points(
         config.COLLECTION, prefetch=prefetch, query=models.FusionQuery(fusion=models.Fusion.RRF), limit=k, with_payload=True,
     )

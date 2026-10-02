@@ -8,10 +8,12 @@ against QDRANT_URL; no re-embedding (and no API calls) needed.
 """
 
 import json
+import re
 import sys
 import time
 import uuid
 
+from google.genai import errors
 from qdrant_client import models
 
 from app import config, llm
@@ -20,8 +22,8 @@ from app.textnorm import sparse_vector
 from ingest.books import TEXT
 
 VECTORS = config.DERIVED_DIR / "vectors.jsonl"
-# Free tier caps embedding tokens per minute; ~10 chunks (~10k tokens) per request, paced.
-BATCH = 10
+# Free-tier embedding quota is tight and varies; adapt the batch size instead of guessing it.
+MAX_BATCH = 10
 PAUSE_S = 12
 
 
@@ -32,15 +34,34 @@ def embed_missing():
         done = {json.loads(l)["id"] for l in VECTORS.open()}
     todo = [c for c in map(json.loads, (TEXT / "chunks.jsonl").open()) if c["id"] not in done]
     print(f"{len(done)} cached, {len(todo)} to embed")
+    batch_size, i = 2, 0
     with VECTORS.open("a") as out:
-        for i in range(0, len(todo), BATCH):
-            batch = todo[i : i + BATCH]
-            # Prefix with book title so the vector knows the source context.
-            vecs = llm.embed([f"{c['book_title']}\n{c['text']}" for c in batch])
+        while i < len(todo):
+            batch = todo[i : i + batch_size]
+            try:
+                # Prefix with book title so the vector knows the source context.
+                vecs = llm.embed([f"{c['book_title']}\n{c['text']}" for c in batch], retry=False)
+            except errors.APIError as e:
+                if e.code not in llm.RETRYABLE:
+                    raise
+                if "PerDay" in str(e):
+                    # Free tier: 1000 embedded texts/day/model. Sleep until the quota resets, then continue.
+                    m = re.search(r"retryDelay': '(\d+)s", str(e))
+                    wait = int(m.group(1)) + 120 if m else 3600
+                    print(f"  daily quota exhausted; sleeping {wait / 3600:.1f}h (until ~{time.strftime('%H:%M', time.localtime(time.time() + wait))})", flush=True)
+                    time.sleep(wait)
+                    batch_size = 2
+                    continue
+                batch_size = max(1, batch_size // 2)
+                print(f"  {e.code} -> batch {batch_size}, waiting 65s", flush=True)
+                time.sleep(65)
+                continue
             for c, v in zip(batch, vecs):
                 out.write(json.dumps({**c, "dense": v}, ensure_ascii=False) + "\n")
             out.flush()
-            print(f"  {i + len(batch)}/{len(todo)}", flush=True)
+            i += len(batch)
+            print(f"  {i}/{len(todo)} (batch {len(batch)})", flush=True)
+            batch_size = min(MAX_BATCH, batch_size + 1)
             time.sleep(PAUSE_S)
 
 

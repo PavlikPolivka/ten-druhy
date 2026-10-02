@@ -121,10 +121,11 @@ def stream_chat(system: str, history: list[dict], model: str | None = None) -> I
             yield chunk.text
 
 
-def embed(texts: list[str], query: bool = False) -> list[list[float]]:
+def embed(texts: list[str], query: bool = False, retry: bool = True) -> list[list[float]]:
     cfg = types.EmbedContentConfig(
         task_type="RETRIEVAL_QUERY" if query else "RETRIEVAL_DOCUMENT",
         output_dimensionality=config.EMBED_DIM,
     )
-    resp = _retry(lambda: client().models.embed_content(model=config.EMBED_MODEL, contents=texts, config=cfg))
+    call = lambda: client().models.embed_content(model=config.EMBED_MODEL, contents=texts, config=cfg)
+    resp = _retry(call) if retry else call()
     return [e.values for e in resp.embeddings]
