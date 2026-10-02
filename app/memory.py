@@ -26,7 +26,8 @@ EXTRACT_SYSTEM = """Jsi paměť postavy „Ten druhý“ – vnitřního hlasu u
 TRVALÉ informace o UŽIVATELI, které stojí za zapamatování na týdny dopředu: lidé v jeho životě (jména, vztahy), \
 práce, koníčky, zdraví, zvyky, preference, důležité plány a události (s datem), jeho obavy a radosti.
 Fakta ber VÝHRADNĚ z toho, co napsal Uživatel. Repliky Toho druhého jsou jen kontext – jeho návrhy, vtipy a domněnky (např. „vezmi k tomu helmu“) NIKDY neukládej jako fakt.
-NEUKLÁDEJ: obsah knih, běžné tlachání, jednorázové drobnosti („jdu si pro kafe“).
+Plány, termíny a události s datem ukládej VŽDY, i pracovní a i když jsou zmíněné jen mimochodem v jiné větě („potřebuju schválení pro zítřejší deploy“ → ulož i ten deploy s datem). Ty jsou nejcennější.
+NEUKLÁDEJ: obsah knih, běžné tlachání, jednorázové drobnosti („jdu si pro kafe“), testovací zprávy.
 Relativní data převeď na absolutní podle aktuálního data (např. „zítra deploy“ → „deploy na produkci v sobotu 3. 10. 2026“).
 Fakta piš česky, krátce, ve 3. osobě („Má dceru Emu (8 let).“).
 scope: "family" jen pro fakta o společné domácnosti/rodině (děti, partner, domácí mazlíčci, společné akce), jinak "user".
@@ -102,7 +103,8 @@ def _apply(user: str, conversation: str, ops: dict, own_ids: set[int]):
             _q("INSERT INTO memories(user, scope, text, conversation) VALUES (?, ?, ?, ?)", (user, scope, text, conversation))
     for u in ops.get("update") or []:
         if u.get("id") in own_ids and (u.get("text") or "").strip():
-            _q("UPDATE memories SET text = ?, updated = CURRENT_TIMESTAMP WHERE id = ?", (u["text"].strip(), u["id"]))
+            _q("UPDATE memories SET text = ?, updated = CURRENT_TIMESTAMP, conversation = ? WHERE id = ?",
+               (u["text"].strip(), conversation, u["id"]))
     for i in ops.get("delete") or []:
         if i in own_ids:
             _q("DELETE FROM memories WHERE id = ?", (i,))
@@ -123,6 +125,32 @@ def extract(user: str, conversation: str, force: bool = False):
     _apply(user, conversation, ops, {f["id"] for f in own})
     _q("INSERT INTO memory_progress(conversation, upto) VALUES (?, ?) ON CONFLICT(conversation) DO UPDATE SET upto = excluded.upto",
        (conversation, new[-1]["id"]))
+
+
+def changed_since(user: str, conversation: str, after_id: int) -> list[dict]:
+    """Facts added/updated from this conversation after a given memory id/time marker (for the 🧠 note in the UI)."""
+    rows = _q("SELECT id, text FROM memories WHERE user = ? AND conversation = ? AND (id > ? OR updated >= datetime('now', '-30 seconds'))"
+              " ORDER BY id", (user, conversation, after_id))
+    return [{"id": i, "text": t} for i, t in rows]
+
+
+def max_id() -> int:
+    rows = _q("SELECT COALESCE(MAX(id), 0) FROM memories")
+    return rows[0][0]
+
+
+def sweep(idle_minutes: int = 10):
+    """Process leftover messages (odd counts, last turns) in conversations idle for a while."""
+    rows = _q("""SELECT c.id, c.user FROM conversations c
+                 WHERE c.updated <= datetime('now', ?)
+                 AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation = c.id AND m.role = 'user'
+                             AND m.id > COALESCE((SELECT upto FROM memory_progress p WHERE p.conversation = c.id), 0))""",
+              (f"-{idle_minutes} minutes",))
+    for cid, user in rows:
+        try:
+            extract(user, cid, force=True)
+        except Exception as e:
+            print(f"  [memory] sweep {cid[:8]}: {str(e)[:80]}", flush=True)
 
 
 def extract_async(user: str, conversation: str):

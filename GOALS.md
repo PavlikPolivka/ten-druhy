@@ -74,7 +74,22 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] On the 2-core server: first request 7.2 s (one-time voice download), then ~2.4 s for a 10 s sentence;
         container 235 MB of its 512 MB limit; image 612 MB
   - [ ] Verify playback on phones
-- [ ] 10. Proactive check-ins
+- [x] 10. Proactive check-ins
+  - [x] Web Push: VAPID keys generated on first start into the data volume; `pywebpush` on the server
+  - [x] "Ozývej se sám" toggle in the paměť panel → permission → subscription per user; test notification; dead
+        subscriptions (404/410) pruned; network errors never kill the scheduler
+  - [x] Service worker: shows the push, tap opens the app on that conversation (`/?c=…`)
+  - [x] Scheduler thread (every 10 min): for users with push + memories, at most every 2 h within 9–21 h,
+        Flash-Lite decides + writes the check-in; max 1 per day; not within 3 h of the user's last message
+  - [x] Check-in = new conversation started by him; history gives Gemini a synthetic opener and merges same-role turns
+  - [x] He never invents outcomes ("deploy nespadl") – asks instead
+  - [x] Tested locally: decision from a dated memory, reply continues his conversation, cooldowns skip
+  - [ ] Verify real push on Android Chrome and installed iOS PWA (iOS 16.4+ only delivers to the installed app)
+- [x] 7b. Memory fixes from real use ("saving only kicked in when asked")
+  - [x] It did run (every 2nd user message) but was invisible → "🧠 zapamatoval jsem si: …" under the reply
+  - [x] Extractor too strict (dropped "zítřejší deploy") → dated plans/events are always kept
+  - [x] Leftover odd messages → scheduler sweeps conversations idle > 10 min
+- [ ] 10b. Automation API (text + voice) for n8n / Home Assistant / scripts
 - [ ] 11. Home Assistant
 - [ ] 12. Real-time voice (Gemini Live)
 - [ ] 13. WhatsApp

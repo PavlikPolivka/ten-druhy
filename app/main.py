@@ -11,11 +11,11 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import llm, memory, retrieval, router, sessions, tts
+from app import checkins, llm, memory, push, retrieval, router, sessions, tts
 from app.prompt import system_prompt
 
 STATIC = Path(__file__).parent / "static"
-app = FastAPI(title="Ten druhý")
+app = FastAPI(title="Ten druhý", on_startup=[checkins.start])
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
@@ -110,9 +110,48 @@ def list_memories(request: Request):
     return {"share_family": memory.shares_family(user), "items": memory.visible(user)}
 
 
+@app.get("/api/memories/new")
+def new_memories(request: Request, conversation_id: str, after: int = 0):
+    """Facts just saved from this conversation (the UI polls once after a reply to show 🧠)."""
+    user = _user(request)
+    return memory.changed_since(user, conversation_id, after) if sessions.owns(user, conversation_id) else []
+
+
 @app.delete("/api/memories/{memory_id}")
 def delete_memory(memory_id: int, request: Request):
     return {"ok": memory.delete(_user(request), memory_id)}
+
+
+@app.get("/api/push/key")
+def push_key(request: Request):
+    return {"key": push.public_key(), "subscribed": push.has_subscription(_user(request))}
+
+
+class PushSubIn(BaseModel):
+    subscription: dict
+
+
+@app.post("/api/push/subscribe")
+def push_subscribe(body: PushSubIn, request: Request):
+    if not str(body.subscription.get("endpoint", "")).startswith("https://"):
+        raise HTTPException(400, "bad subscription")
+    push.subscribe(_user(request), body.subscription)
+    return {"ok": True}
+
+
+class PushUnsubIn(BaseModel):
+    endpoint: str
+
+
+@app.post("/api/push/unsubscribe")
+def push_unsubscribe(body: PushUnsubIn, request: Request):
+    push.unsubscribe(_user(request), body.endpoint)
+    return {"ok": True}
+
+
+@app.post("/api/push/test")
+def push_test(request: Request):
+    return {"sent": push.send(_user(request), "Ten druhý", "Tak co, funguje to? Jestli jo, budu se ozývat. Bohužel.")}
 
 
 class TtsIn(BaseModel):
@@ -186,7 +225,7 @@ def chat(body: ChatIn, request: Request):
     name = _first_name(request)
 
     def events():
-        yield _sse({"conversation_id": cid})
+        yield _sse({"conversation_id": cid, "memory_mark": memory.max_id()})
         try:
             # Only pull book excerpts when the message is actually about the books.
             about_books, query = router.route(last_user, body.message) if body.message.strip() else (False, "")

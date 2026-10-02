@@ -174,6 +174,14 @@ def history(conversation: str, budget_tokens: int = config.HISTORY_TOKENS) -> li
                 item["content"] = f"[poslal fotku] {m['content']}".strip()
         out.append(item)
     out.reverse()
-    while out and out[0]["role"] != "user":
-        out.pop(0)
-    return out
+    # Gemini wants user/model alternation starting with the user. Check-in conversations start with his message,
+    # so give it a synthetic opener; merge consecutive same-role turns (e.g. check-in after his last reply).
+    if out and out[0]["role"] != "user":
+        out.insert(0, {"role": "user", "content": "(nic jsem nepsal – ozval ses sám od sebe)"})
+    merged = []
+    for m in out:
+        if merged and merged[-1]["role"] == m["role"] and not m.get("image") and not merged[-1].get("image"):
+            merged[-1] = {**merged[-1], "content": merged[-1]["content"] + "\n\n" + m["content"]}
+        else:
+            merged.append(m)
+    return merged

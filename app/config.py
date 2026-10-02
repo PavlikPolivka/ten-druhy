@@ -28,6 +28,10 @@ TTS_STYLE = os.getenv("TTS_STYLE", "")
 PIPER_VOICE = os.getenv("PIPER_VOICE", "cs_CZ-jirka-medium")
 PIPER_LENGTH_SCALE = float(os.getenv("PIPER_LENGTH_SCALE", "0.9"))  # <1 = faster
 
+# Proactive check-ins via Web Push (scheduler thread in the app). VAPID "sub" claim must be mailto: or https URL.
+CHECKINS = os.getenv("CHECKINS", "1") == "1"
+PUSH_CONTACT = os.getenv("PUSH_CONTACT", "https://druhy.ppolivka.com")
+
 QDRANT_URL = os.getenv("QDRANT_URL", "")  # empty -> embedded local Qdrant at data/qdrant
 QDRANT_PATH = ROOT / "data" / "qdrant"
 COLLECTION = os.getenv("COLLECTION", "kulhanek")

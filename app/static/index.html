@@ -87,6 +87,7 @@
   .share input { margin-top: 2px; accent-color: var(--accent); }
   .fam { color: var(--accent); font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; margin-right: 4px; }
   @media (max-width: 520px) { header small { display: none; } .hbtn { padding: 4px 7px; } }
+  .mem { display: block; margin-top: 6px; font: .75rem system-ui, sans-serif; color: var(--muted); font-style: italic; }
   .voice { display: block; margin-top: 6px; font: .75rem system-ui, sans-serif; color: var(--muted); }
   .voice.play { color: var(--accent); cursor: pointer; }
   .voice i { font-style: normal; animation: blink 1.2s infinite; }
@@ -132,7 +133,8 @@ const log = document.getElementById('log'), q = document.getElementById('q'),
       send = document.getElementById('send'), form = document.getElementById('f');
 
 // Conversations live on the server per Authelia user, so the same chat shows up on every device.
-let cid = null;
+let cid = new URLSearchParams(location.search).get('c');  // set when opened from a check-in notification
+if (cid) history.replaceState(null, '', location.pathname);
 
 function bubble(cls, text, imgSrc) {
   const empty = log.querySelector('.empty'); if (empty) empty.remove();
@@ -205,6 +207,48 @@ function twoStep(btn, label, onConfirm) {
   };
 }
 
+// ---- Proactive check-ins (Web Push) ----
+function b64ToBytes(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4), raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+}
+
+async function pushToggle() {
+  const row = document.createElement('label'); row.className = 'share';
+  const cb = document.createElement('input'); cb.type = 'checkbox';
+  const txt = document.createElement('span');
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  if (!supported) {
+    cb.disabled = true;
+    txt.textContent = 'Ozývání se samo od sebe: tenhle prohlížeč neumí upozornění. (Na iPhonu jen v aplikaci přidané na plochu.)';
+    row.append(cb, txt); return row;
+  }
+  const reg = await navigator.serviceWorker.ready;
+  const current = await reg.pushManager.getSubscription();
+  cb.checked = !!current && Notification.permission === 'granted';
+  txt.textContent = 'Ozývej se sám – občas ti napíšu, když se něco děje (deploy, narozeniny…). Max jednou denně, 9–21 h.';
+  cb.onchange = async () => {
+    try {
+      if (cb.checked) {
+        if (await Notification.requestPermission() !== 'granted') { cb.checked = false; return; }
+        const { key } = await (await fetch('api/push/key')).json();
+        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+        await fetch('api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ subscription: sub.toJSON() }) });
+        fetch('api/push/test', { method: 'POST' }).catch(() => {});
+      } else {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch('api/push/unsubscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ endpoint: sub.endpoint }) });
+          await sub.unsubscribe();
+        }
+      }
+    } catch (e) { cb.checked = false; txt.textContent = 'Nepovedlo se zapnout upozornění: ' + e.message; }
+  };
+  row.append(cb, txt); return row;
+}
+
 async function openMemory() {
   dtitle.textContent = 'Co o tobě vím';
   drawer.classList.add('open'); convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
@@ -220,7 +264,9 @@ async function openMemory() {
                                   body: JSON.stringify({ share_family: cb.checked }) }).catch(() => {});
     openMemory();
   };
-  share.append(cb, txt); convs.appendChild(share);
+  share.append(cb, txt);
+  convs.appendChild(await pushToggle());
+  convs.appendChild(share);
   if (!st.items.length) {
     convs.insertAdjacentHTML('beforeend', '<p class="empty" style="margin-top:2em">Zatím nic. Musíš mi něco říct, chytráku.</p>');
     return;
@@ -403,6 +449,24 @@ if (Recognition) {
   };
 }
 
+// Memory is extracted in the background a few seconds after a reply; show what got saved.
+let memMark = 0;
+function watchMemory(el, conv, mark) {
+  let shown = new Set();
+  const check = async () => {
+    try {
+      const items = await (await fetch('api/memories/new?conversation_id=' + encodeURIComponent(conv) + '&after=' + mark)).json();
+      const fresh = items.filter(m => !shown.has(m.id));
+      if (!fresh.length) return;
+      fresh.forEach(m => shown.add(m.id));
+      let tag = el.querySelector('.mem');
+      if (!tag) { tag = document.createElement('span'); tag.className = 'mem'; tag.title = 'Spravuješ v „paměť“'; el.appendChild(tag); }
+      tag.textContent = '🧠 zapamatoval jsem si: ' + [...shown].map(id => items.find(m => m.id === id)?.text).filter(Boolean).join(' · ');
+    } catch (e) {}
+  };
+  [4000, 10000, 20000].forEach(ms => setTimeout(check, ms));  // extraction takes longer when models fall back
+}
+
 form.onsubmit = async e => {
   e.preventDefault();
   const text = q.value.trim(); if ((!text && !photo) || send.disabled) return;
@@ -427,13 +491,13 @@ form.onsubmit = async e => {
         const line = buf.slice(0, i); buf = buf.slice(i + 2);
         if (!line.startsWith('data: ')) continue;
         const ev = JSON.parse(line.slice(6));
-        if (ev.conversation_id) cid = ev.conversation_id;
+        if (ev.conversation_id) { cid = ev.conversation_id; memMark = ev.memory_mark || 0; }
         if (ev.t) { got += ev.t; him.textContent = got; log.scrollTop = log.scrollHeight; }
         if (ev.error) { const s = document.createElement('span'); s.className = 'err'; s.textContent = (got ? '\n' : '') + ev.error;
                         if (!got) him.textContent = ''; him.appendChild(s); }
         if (ev.done && ev.sources && ev.sources.length) { const s = document.createElement('span'); s.className = 'src';
                         s.textContent = 'vzpomínky z: ' + ev.sources.join(', '); him.appendChild(s); }
-        if (ev.done) { him.dataset.text = got; addRating(him, ev.message_id, null); if (speakReply) speak(got, him); }
+        if (ev.done) { him.dataset.text = got; addRating(him, ev.message_id, null); watchMemory(him, cid, memMark); if (speakReply) speak(got, him); }
       }
     }
   } catch (err) {
