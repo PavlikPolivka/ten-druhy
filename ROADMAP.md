@@ -28,8 +28,6 @@ per-model daily quotas), 2-core homelab box, identity comes from Authelia (`Remo
 | 19 | **Journal & weekly review** – evening question, Sunday recap from memory | 1–2 h | |
 | 20 | **Jellyfin** – "co mám dneska koukat?" from the library | 1–2 h | |
 | 21 | **Morning brief** – today's events (calendar + memory) + weather for Buštěhrad; 7:00 weekdays, 9:00 weekends | 2 h | |
-| 22 | **n8n actions** – trigger allowlisted n8n workflows via webhooks | 2 h | |
-| 23 | **Paperless search** – find documents in Paperless-ngx ("kde mám záruku k pračce?") | 2 h | |
 | 24 | **Homelab watchdog** – alerts in his voice: backups, disk/RAM/load, containers down/looping, certs/tunnel/OS updates | 2–3 h | |
 | 25 | **Home Assistant** – control + sensors + announce on speakers (was #11) | 2–3 h | |
 | 26 | **Kulhánek adventure** – interactive text adventure in the books' world, he narrates | 2–3 h | |
@@ -46,4 +44,5 @@ per-model daily quotas), 2-core homelab box, identity comes from Authelia (`Remo
   server commands = broad scope but every state change confirmed by a button tap, admins only;
   calendar = Google (iCal URL); brief = events + weather (Buštěhrad), 7:00 weekdays / 9:00 weekends;
   watchdog = backups, disk/resources, containers, certs & updates.
-- Tools (Gemini function calling) are the shared foundation for 16, 17, 20, 22–25, 28.
+- Tools (Gemini function calling) are the shared foundation for 16, 17, 20, 24, 25, 28.
+- Dropped after the interview: n8n actions (22), Paperless search (23).

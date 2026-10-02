@@ -97,8 +97,6 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
 - [ ] 19. Journal & weekly review
 - [ ] 20. Jellyfin
 - [ ] 21. Morning brief (events + weather Buštěhrad; 7:00 weekdays, 9:00 weekends)
-- [ ] 22. n8n actions
-- [ ] 23. Paperless search
 - [ ] 24. Homelab watchdog (backups, disk/resources, containers, certs & updates)
 - [ ] 25. Home Assistant control
 - [ ] 26. Kulhánek adventure
