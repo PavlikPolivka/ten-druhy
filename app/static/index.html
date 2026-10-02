@@ -248,6 +248,36 @@ function calendarRow(cal) {
   render(cal); return row;
 }
 
+// API keys for /v1 (Home Assistant, n8n, scripts). The token is shown once, right after creating it.
+async function keysRow() {
+  const box = document.createElement('div'); box.className = 'share'; box.style.cssText = 'flex-direction:column;cursor:default';
+  let keys = [];
+  try { keys = await (await fetch('api/keys')).json(); } catch (e) {}
+  const head = document.createElement('div'); head.textContent = '🔑 API klíče (pro Home Assistant, n8n, skripty – http://tendruhy:8000/v1):';
+  box.appendChild(head);
+  for (const k of keys) {
+    const r = document.createElement('div'); r.style.cssText = 'display:flex;gap:8px;align-items:center';
+    const t = document.createElement('span'); t.style.flex = '1';
+    t.textContent = k.name + ' · ' + (k.last_used ? 'naposledy ' + when(k.last_used) : 'zatím nepoužitý');
+    const del = document.createElement('button');
+    twoStep(del, 'zrušit', async () => { await fetch('api/keys/' + k.id, { method: 'DELETE' }).catch(() => {}); r.remove(); });
+    r.append(t, del); box.appendChild(r);
+  }
+  const add = document.createElement('div'); add.style.cssText = 'display:flex;gap:8px';
+  const inp = document.createElement('input'); inp.placeholder = 'název (např. Home Assistant)';
+  inp.style.cssText = 'flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink)';
+  const btn = document.createElement('button'); btn.className = 'hbtn'; btn.type = 'button'; btn.textContent = 'vytvořit';
+  const out = document.createElement('code'); out.style.cssText = 'word-break:break-all;color:var(--ink)';
+  btn.onclick = async () => {
+    if (!inp.value.trim()) return;
+    const r = await fetch('api/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: inp.value.trim() }) });
+    const d = await r.json().catch(() => ({}));
+    if (d.token) { out.textContent = d.token + '  ← zkopíruj si ho teď, víc ho neuvidíš'; inp.value = ''; }
+  };
+  add.append(inp, btn); box.append(add, out);
+  return box;
+}
+
 const TONES = [['full', 'naplno'], ['mild', 'mírně'], ['kid', 'pro děti']];
 function tonePicker(current, locked) {
   const row = document.createElement('div'); row.className = 'share tone';
@@ -327,6 +357,7 @@ async function openMemory() {
   convs.appendChild(calendarRow(st.calendar || {}));
   convs.appendChild(await pushToggle());
   convs.appendChild(share);
+  convs.appendChild(await keysRow());
   let rems = [];
   try { rems = await (await fetch('api/reminders')).json(); } catch (e) {}
   if (rems.length) {

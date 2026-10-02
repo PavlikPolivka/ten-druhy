@@ -48,3 +48,19 @@ Routing: Caddy `:9096 { import authelia; reverse_proxy tendruhy:8000 }`, Autheli
 
 Backups: `/opt/tendruhy/data` and `/opt/tendruhy/.env` are in the nightly restic job. Qdrant is not backed up —
 it is rebuilt from `vectors.jsonl` with `python -m ingest.embed --load`.
+
+## OpenAI-compatible API (Home Assistant, n8n, scripts)
+Create a key in the app: **paměť → 🔑 API klíče**. The key decides the user (memory, calendar, reminders, tone apply).
+Base URL inside the `portal` Docker network: `http://tendruhy:8000/v1` (not exposed through Authelia).
+
+```sh
+curl http://tendruhy:8000/v1/chat/completions -H "Authorization: Bearer td_…" -H "Content-Type: application/json" \
+  -d '{"model":"ten-druhy","messages":[{"role":"user","content":"připomeň mi v 18 vyvenčit psa"}]}'
+curl http://tendruhy:8000/v1/audio/speech -H "Authorization: Bearer td_…" -H "Content-Type: application/json" \
+  -d '{"model":"piper","input":"Tak co, přežili jsme to?"}' -o out.wav
+```
+- `POST /v1/chat/completions` – stream or not; `system` messages (e.g. Home Assistant's device list) are passed as extra
+  context, the persona stays. Stateless: the client sends the history.
+- `GET /v1/models` → `ten-druhy`; `POST /v1/audio/speech` → WAV (Piper).
+- Home Assistant: any integration that accepts a custom OpenAI base URL (e.g. "Extended OpenAI Conversation") works.
+- n8n: "OpenAI" credentials with base URL `http://tendruhy:8000/v1`.

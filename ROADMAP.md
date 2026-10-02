@@ -24,7 +24,7 @@ per-model daily quotas), 2-core homelab box, identity comes from Authelia (`Remo
 | 15 | **Per-person tone** – full / mild / kid setting per user (Elenka gets no swearing/violence) | 1 h | ✅ done |
 | 16 | **Reminders** – "připomeň mi zítra v 8…" → push at that time in his voice | 1–2 h | ✅ done |
 | 17 | **Calendar** – Google Calendar via each user's secret iCal URL; feeds replies, check-ins, brief | 1–2 h | ✅ done |
-| 18 | **OpenAI-compatible API** – `/v1/chat/completions` + `/v1/audio/speech` (Piper), token auth, for HA Assist / n8n / scripts on the `portal` network (replaces 10b) | 1–2 h | |
+| 18 | **OpenAI-compatible API** – `/v1/chat/completions` + `/v1/audio/speech` (Piper), token auth, for HA Assist / n8n / scripts on the `portal` network (replaces 10b) | 1–2 h | ✅ done |
 | 19 | **Journal & weekly review** – evening question, Sunday recap from memory | 1–2 h | |
 | 20 | **Jellyfin** – "co mám dneska koukat?" from the library | 1–2 h | |
 | 21 | **Morning brief** – today's events (calendar + memory) + weather for Buštěhrad; 7:00 weekdays, 9:00 weekends | 2 h | |

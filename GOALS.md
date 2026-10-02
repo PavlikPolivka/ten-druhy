@@ -118,7 +118,15 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Check-ins see the next 2 days of events (and run for users with a calendar even without memories)
   - [x] Tested with a generated .ics: "co mám zítra", "kdy mám zubaře", "příští týden", small talk unaffected
   - [ ] Real calendar connected by the user
-- [ ] 18. OpenAI-compatible API + voice (replaces 10b)
+- [x] 18. OpenAI-compatible API + voice (replaces 10b)
+  - [x] API keys per user, created/revoked in the settings panel; shown once, stored as SHA-256, "last used" shown
+  - [x] Shared reply pipeline `reply_stream()` (router → tools → books/web/weather → prompt → stream) for web chat + API
+  - [x] `POST /v1/chat/completions` (stream + non-stream), `GET /v1/models` (`ten-druhy`)
+  - [x] Client system messages (e.g. Home Assistant's device context) passed as extra context, persona stays
+  - [x] `POST /v1/audio/speech` → WAV from Piper
+  - [x] Reachable inside the `portal` network at http://tendruhy:8000/v1; through the public domain it's behind Authelia
+  - [x] Tested with the official `openai` client: models, chat, stream, HA-style context, reminder via API, speech, bad key → 401
+  - [ ] Known gap: inside the `portal` network `/api/*` trusts the `Remote-User` header → add a Caddy-set shared secret
 - [ ] 19. Journal & weekly review
 - [ ] 20. Jellyfin
 - [ ] 21. Morning brief (events + weather Buštěhrad; 7:00 weekdays, 9:00 weekends)

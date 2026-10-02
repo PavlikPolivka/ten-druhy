@@ -11,12 +11,16 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import calendar_ics, checkins, llm, memory, push, reminders, retrieval, router, sessions, tools, tts, web
+from app import apikeys, calendar_ics, checkins, llm, memory, push, reminders, retrieval, router, sessions, tools, tts, web
 from app.prompt import system_prompt
 
 STATIC = Path(__file__).parent / "static"
 app = FastAPI(title="Ten druhý", on_startup=[checkins.start, reminders.start])
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+from app.openai_api import router as openai_router  # noqa: E402  (/v1/*, bearer-key auth)
+
+app.include_router(openai_router)
 
 
 def _header(request: Request, name: str) -> str:
@@ -130,6 +134,25 @@ def list_memories(request: Request):
     t, locked = memory.tone(user)
     return {"share_family": memory.shares_family(user), "tone": t, "tone_locked": locked, "items": memory.visible(user),
             "calendar": calendar_ics.status(user)}
+
+
+@app.get("/api/keys")
+def list_keys(request: Request):
+    return apikeys.list_(_user(request))
+
+
+class KeyIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
+
+@app.post("/api/keys")
+def create_key(body: KeyIn, request: Request):
+    return {"token": apikeys.create(_user(request), body.name)}  # shown once
+
+
+@app.delete("/api/keys/{key_id}")
+def revoke_key(key_id: int, request: Request):
+    return {"ok": apikeys.revoke(_user(request), key_id)}
 
 
 @app.get("/api/reminders")
@@ -266,6 +289,36 @@ def _decode_image(b64: str | None) -> bytes | None:
     return data
 
 
+def friendly_error(e: Exception) -> str:
+    msg = str(e)
+    return "Došla denní kvóta Gemini free tieru. Zkus to později." if "429" in msg or "RESOURCE_EXHAUSTED" in msg else msg
+
+
+def reply_stream(user: str, name: str, prev: list[dict], message: str, img: bytes | None = None, client_context: str = ""):
+    """The whole reply pipeline, shared by the web chat and the OpenAI-compatible API.
+
+    Yields ("t", text piece) while streaming, then ("done", {"text", "sources", "links", "weather", "actions"}).
+    Tools run here (reminders etc.), so callers only persist the exchange if they want to.
+    """
+    last_user = next((m["content"] for m in reversed(prev) if m["role"] == "user"), "")
+    r = router.route(last_user, message, user) if message.strip() else router.Route(actions=[])
+    done = tools.run(user, r.actions)
+    chunks = _search(r.book_query) if r.books else []
+    outside, links = _outside(r)
+    if client_context:
+        outside = "\n\n".join(b for b in (outside, "Kontext od aplikace, která tě volá:\n" + client_context) if b)
+    mem_block = "\n\n".join(b for b in (memory.prompt_block(user), calendar_ics.prompt_block(user)) if b)
+    system = system_prompt(chunks, name, mem_block, outside, memory.tone(user)[0], done)
+    text_in = message.strip() or "(posílá ti fotku, bez komentáře)"
+    convo = prev + [{"role": "user", "content": text_in, "image": (img, "image/jpeg") if img else None}]
+    reply = []
+    for piece in llm.stream_chat(system, convo):
+        reply.append(piece)
+        yield "t", piece
+    yield "done", {"text": "".join(reply).strip(), "sources": sorted({c["book_title"] for c in chunks}),
+                   "links": links, "weather": r.weather, "actions": [d.split(":", 1)[0] for d in done]}
+
+
 @app.post("/api/chat")
 def chat(body: ChatIn, request: Request):
     img = _decode_image(body.image)
@@ -274,39 +327,28 @@ def chat(body: ChatIn, request: Request):
     user = _user(request)
     cid = body.conversation_id if sessions.owns(user, body.conversation_id) else sessions.create(user)
     prev = sessions.history(cid)
-    last_user = next((m["content"] for m in reversed(prev) if m["role"] == "user"), "")
     name = _first_name(request)
 
     def events():
         yield _sse({"conversation_id": cid, "memory_mark": memory.max_id()})
         try:
-            # Only pull book excerpts when the message is actually about the books.
-            r = router.route(last_user, body.message, user) if body.message.strip() else router.Route(actions=[])
-            done = tools.run(user, r.actions)
-            chunks = _search(r.book_query) if r.books else []
-            outside, links = _outside(r)
-            mem_block = "\n\n".join(b for b in (memory.prompt_block(user), calendar_ics.prompt_block(user)) if b)
-            system = system_prompt(chunks, name, mem_block, outside, memory.tone(user)[0], done)
-            text_in = body.message.strip() or "(posílá ti fotku, bez komentáře)"
-            convo = prev + [{"role": "user", "content": text_in, "image": (img, "image/jpeg") if img else None}]
-            reply = []
-            for piece in llm.stream_chat(system, convo):
-                reply.append(piece)
-                yield _sse({"t": piece})
-            text = "".join(reply).strip()
+            text, info = "", {}
+            for kind, val in reply_stream(user, name, prev, body.message, img):
+                if kind == "t":
+                    yield _sse({"t": val})
+                else:
+                    text, info = val["text"], val
             mid = None
             if text:
+                text_in = body.message.strip() or "(posílá ti fotku, bez komentáře)"
                 sessions.add(cid, "user", body.message.strip(), sessions.save_image(img) if img else None)
                 mid = sessions.add(cid, "assistant", text)
                 memory.extract_async(user, cid)
                 if not prev and not sessions.title(cid):
                     threading.Thread(target=_make_title, args=(cid, text_in, text), daemon=True).start()
-            yield _sse({"done": True, "message_id": mid, "sources": sorted({c["book_title"] for c in chunks}),
-                        "links": links, "weather": r.weather, "actions": [d.split(":", 1)[0] for d in done]})
+            yield _sse({"done": True, "message_id": mid, "sources": info.get("sources", []),
+                        "links": info.get("links", []), "weather": info.get("weather"), "actions": info.get("actions", [])})
         except Exception as e:  # surface errors (e.g. free-tier quota) to the UI instead of a dead stream
-            msg = str(e)
-            if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
-                msg = "Došla denní kvóta Gemini free tieru. Zkus to později."
-            yield _sse({"error": msg})
+            yield _sse({"error": friendly_error(e)})
 
     return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
