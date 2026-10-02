@@ -38,16 +38,43 @@ def client() -> genai.Client:
     return _client
 
 
+RETRYABLE = (429, 500, 503)
+
+
 def _retry(fn, attempts: int = 8):
     for i in range(attempts):
         try:
             return fn()
         except errors.APIError as e:
-            if e.code not in (429, 500, 503) or i == attempts - 1:
+            if e.code not in RETRYABLE or i == attempts - 1:
                 raise
             delay = min(120, 5 * 2**i) + random.random() * 3
             print(f"  [llm] {e.code}, retry in {delay:.0f}s", flush=True)
             time.sleep(delay)
+
+
+def _chain(primary: str) -> list[str]:
+    return list(dict.fromkeys([primary, *config.FALLBACK_MODELS]))
+
+
+def _with_fallback(models: list[str], call, attempts: int, rounds: int = 1):
+    """Try each model a few times; overloaded (503) or rate-limited (429) models fall through to the next."""
+    last = None
+    for r in range(rounds):
+        for m in models:
+            for i in range(attempts):
+                try:
+                    return call(m)
+                except errors.APIError as e:
+                    if e.code not in RETRYABLE:
+                        raise
+                    last = e
+                    print(f"  [llm] {m}: {e.code} (round {r + 1}, try {i + 1})", flush=True)
+                    if i < attempts - 1:
+                        time.sleep(min(20, 2 * 2**i) + random.random())
+        if r < rounds - 1:
+            time.sleep(60)
+    raise last
 
 
 def _contents(history: list[dict]) -> list[types.Content]:
@@ -65,15 +92,28 @@ def generate(system: str, user: str, model: str | None = None, json_mode: bool =
         response_mime_type="application/json" if json_mode else None,
         automatic_function_calling=NO_AFC,
     )
-    resp = _retry(lambda: client().models.generate_content(model=model or config.EXTRACT_MODEL, contents=user, config=cfg))
+    # Batch scripts: be patient (several rounds across the fallback chain).
+    resp = _with_fallback(
+        _chain(model or config.EXTRACT_MODEL),
+        lambda m: client().models.generate_content(model=m, contents=user, config=cfg),
+        attempts=3, rounds=5,
+    )
     return resp.text or ""
 
 
 def stream_chat(system: str, history: list[dict], model: str | None = None) -> Iterator[str]:
     cfg = types.GenerateContentConfig(system_instruction=system, temperature=0.9, safety_settings=SAFETY,
                                       automatic_function_calling=NO_AFC)
-    stream = _retry(lambda: client().models.generate_content_stream(
-        model=model or config.LLM_MODEL, contents=_contents(history), config=cfg))
+    contents = _contents(history)
+
+    def start(m):
+        # Errors can surface on the first read, so pull the first chunk inside the fallback.
+        stream = iter(client().models.generate_content_stream(model=m, contents=contents, config=cfg))
+        return next(stream, None), stream
+
+    first, stream = _with_fallback(_chain(model or config.LLM_MODEL), start, attempts=2)
+    if first is not None and first.text:
+        yield first.text
     for chunk in stream:
         if chunk.text:
             yield chunk.text
