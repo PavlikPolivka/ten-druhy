@@ -51,7 +51,10 @@ it is rebuilt from `vectors.jsonl` with `python -m ingest.embed --load`.
 
 ## OpenAI-compatible API (Home Assistant, n8n, scripts)
 Create a key in the app: **paměť → 🔑 API klíče**. The key decides the user (memory, calendar, reminders, tone apply).
-Base URL inside the `portal` Docker network: `http://tendruhy:8000/v1` (not exposed through Authelia).
+Base URL: `https://druhy.ppolivka.com/v1` from anywhere (Authelia bypasses `/v1`, the API key is the auth), or
+`http://tendruhy:8000/v1` inside the `portal` Docker network. Keys: settings panel, or on the server
+`docker compose exec tendruhy python -m app.apikeys list | create <user> <name> | revoke <id>`.
+Everything else requires Caddy's `X-TD-Proxy` secret (`TD_PROXY_SECRET` in .env), i.e. a real Authelia login.
 
 ```sh
 curl http://tendruhy:8000/v1/chat/completions -H "Authorization: Bearer td_…" -H "Content-Type: application/json" \

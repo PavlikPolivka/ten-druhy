@@ -126,7 +126,11 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] `POST /v1/audio/speech` → WAV from Piper
   - [x] Reachable inside the `portal` network at http://tendruhy:8000/v1; through the public domain it's behind Authelia
   - [x] Tested with the official `openai` client: models, chat, stream, HA-style context, reminder via API, speech, bad key → 401
-  - [ ] Known gap: inside the `portal` network `/api/*` trusts the `Remote-User` header → add a Caddy-set shared secret
+  - [x] Security: Caddy adds `X-TD-Proxy` (shared secret in .env); the app rejects everything but /v1 and /healthz
+        without it → `Remote-User` can't be spoofed from inside the `portal` network (verified: 403)
+  - [x] Public API: Authelia `bypass` for `^/v1/.*$` on druhy.ppolivka.com; /v1 checks its own keys (verified:
+        no key 401, key works for models/chat/stream/speech; page and /api still 302 to Authelia)
+  - [x] Key management: settings panel per user + `python -m app.apikeys list|create|revoke` on the server
 - [ ] 19. Journal & weekly review
 - [ ] 20. Jellyfin
 - [ ] 21. Morning brief (events + weather Buštěhrad; 7:00 weekdays, 9:00 weekends)
