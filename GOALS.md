@@ -89,7 +89,13 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] It did run (every 2nd user message) but was invisible → "🧠 zapamatoval jsem si: …" under the reply
   - [x] Extractor too strict (dropped "zítřejší deploy") → dated plans/events are always kept
   - [x] Leftover odd messages → scheduler sweeps conversations idle > 10 min
-- [ ] 14. Web search
+- [x] 14. Web search
+  - [x] Gemini Google Search grounding: not available on the free tier (empty 429) → user chose DuckDuckGo + Open-Meteo
+  - [x] Router decides `books` / `weather` (+ place) / `web` (+ query) per message
+  - [x] Weather: Open-Meteo geocoding + forecast (home = Buštěhrad), retried on 503; web search skipped when weather answered
+  - [x] Web: DuckDuckGo (`ddgs`, region cz-cz) top 5 snippets into the prompt; top 3 links shown under the reply
+  - [x] Tested: tomorrow's weather, "vezmu si bundu?", Kaufland opening hours, small talk without search
+  - Note: free search snippets are thin for things like sports results
 - [ ] 15. Per-person tone (full / mild / kid)
 - [ ] 16. Reminders
 - [ ] 17. Calendar (Google iCal URL)

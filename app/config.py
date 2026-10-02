@@ -32,6 +32,9 @@ PIPER_LENGTH_SCALE = float(os.getenv("PIPER_LENGTH_SCALE", "0.9"))  # <1 = faste
 CHECKINS = os.getenv("CHECKINS", "1") == "1"
 PUSH_CONTACT = os.getenv("PUSH_CONTACT", "https://druhy.ppolivka.com")
 
+# Home for weather questions without a place, and the morning brief.
+HOME_PLACE = os.getenv("HOME_PLACE", "Buštěhrad")
+
 QDRANT_URL = os.getenv("QDRANT_URL", "")  # empty -> embedded local Qdrant at data/qdrant
 QDRANT_PATH = ROOT / "data" / "qdrant"
 COLLECTION = os.getenv("COLLECTION", "kulhanek")

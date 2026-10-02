@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import checkins, llm, memory, push, retrieval, router, sessions, tts
+from app import checkins, llm, memory, push, retrieval, router, sessions, tts, web
 from app.prompt import system_prompt
 
 STATIC = Path(__file__).parent / "static"
@@ -44,6 +44,26 @@ def _search(query: str) -> list[dict]:
     except Exception as e:  # Qdrant down / collection missing: answer from the lore bible alone
         print(f"  [retrieval] failed: {str(e)[:120]}", flush=True)
         return []
+
+
+def _outside(r: router.Route) -> tuple[str, list[dict]]:
+    """Weather / web search context for the prompt + link list for the UI. Failures just mean no context."""
+    blocks, links = [], []
+    if r.weather:
+        try:
+            blocks.append(web.weather(r.place or None))
+        except Exception as e:
+            print(f"  [weather] failed: {str(e)[:100]}", flush=True)
+    # A weather question needs no web search once Open-Meteo answered (the router tends to ask for both).
+    if r.web and not (r.weather and blocks):
+        try:
+            hits = web.search(r.web_query)
+            blocks.append("Výsledky hledání „" + r.web_query + "“:\n" + "\n".join(
+                f"- {h['title']}: {h['snippet']} ({h['url']})" for h in hits))
+            links = [{"title": h["title"], "url": h["url"]} for h in hits[:3]]
+        except Exception as e:
+            print(f"  [web] failed: {str(e)[:100]}", flush=True)
+    return "\n\n".join(blocks), links
 
 
 def _sse(obj: dict) -> str:
@@ -228,9 +248,10 @@ def chat(body: ChatIn, request: Request):
         yield _sse({"conversation_id": cid, "memory_mark": memory.max_id()})
         try:
             # Only pull book excerpts when the message is actually about the books.
-            about_books, query = router.route(last_user, body.message) if body.message.strip() else (False, "")
-            chunks = _search(query) if about_books else []
-            system = system_prompt(chunks, name, memory.prompt_block(user))
+            r = router.route(last_user, body.message) if body.message.strip() else router.Route()
+            chunks = _search(r.book_query) if r.books else []
+            outside, links = _outside(r)
+            system = system_prompt(chunks, name, memory.prompt_block(user), outside)
             text_in = body.message.strip() or "(posílá ti fotku, bez komentáře)"
             convo = prev + [{"role": "user", "content": text_in, "image": (img, "image/jpeg") if img else None}]
             reply = []
@@ -245,7 +266,8 @@ def chat(body: ChatIn, request: Request):
                 memory.extract_async(user, cid)
                 if not prev and not sessions.title(cid):
                     threading.Thread(target=_make_title, args=(cid, text_in, text), daemon=True).start()
-            yield _sse({"done": True, "message_id": mid, "sources": sorted({c["book_title"] for c in chunks})})
+            yield _sse({"done": True, "message_id": mid, "sources": sorted({c["book_title"] for c in chunks}),
+                        "links": links, "weather": r.weather})
         except Exception as e:  # surface errors (e.g. free-tier quota) to the UI instead of a dead stream
             msg = str(e)
             if "429" in msg or "RESOURCE_EXHAUSTED" in msg:

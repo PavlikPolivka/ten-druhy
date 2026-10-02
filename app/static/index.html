@@ -41,6 +41,7 @@
   .him::before { content: "Ten druhý"; display: block; font-size: .75rem; color: var(--accent);
                  font-family: system-ui, sans-serif; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 2px; }
   .src { display: block; margin-top: 6px; font-size: .75rem; color: var(--muted); font-family: system-ui, sans-serif; }
+  .src a { color: var(--muted); }
   .err { color: var(--accent); font-style: italic; }
   .empty { color: var(--muted); text-align: center; margin-top: 18vh; font-style: italic; }
   form { display: flex; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
@@ -497,6 +498,15 @@ form.onsubmit = async e => {
                         if (!got) him.textContent = ''; him.appendChild(s); }
         if (ev.done && ev.sources && ev.sources.length) { const s = document.createElement('span'); s.className = 'src';
                         s.textContent = 'vzpomínky z: ' + ev.sources.join(', '); him.appendChild(s); }
+        if (ev.done && ev.links && ev.links.length) {
+          const s = document.createElement('span'); s.className = 'src'; s.append('z webu: ');
+          ev.links.forEach((l, i) => {
+            const a = document.createElement('a'); a.href = l.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+            a.textContent = l.title.length > 40 ? l.title.slice(0, 40) + '…' : l.title;
+            if (i) s.append(' · '); s.appendChild(a);
+          });
+          him.appendChild(s);
+        }
         if (ev.done) { him.dataset.text = got; addRating(him, ev.message_id, null); watchMemory(him, cid, memMark); if (speakReply) speak(got, him); }
       }
     }

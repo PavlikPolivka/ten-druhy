@@ -20,7 +20,7 @@ per-model daily quotas), 2-core homelab box, identity comes from Authelia (`Remo
 
 | # | Feature | Effort | Status |
 |---|---|---|---|
-| 14 | **Web search** – Gemini Google Search grounding for current info | 1 h | |
+| 14 | **Web search** – DuckDuckGo + Open-Meteo weather (Gemini grounding isn't free) | 1 h | ✅ done |
 | 15 | **Per-person tone** – full / mild / kid setting per user (Elenka gets no swearing/violence) | 1 h | |
 | 16 | **Reminders** – "připomeň mi zítra v 8…" → push at that time in his voice | 1–2 h | |
 | 17 | **Calendar** – Google Calendar via each user's secret iCal URL; feeds replies, check-ins, brief | 1–2 h | |
