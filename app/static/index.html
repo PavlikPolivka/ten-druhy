@@ -83,6 +83,10 @@
   #mic.on { background: var(--accent); color: #fff; border-color: var(--accent); animation: pulse 1.2s infinite; }
   @keyframes pulse { 50% { opacity: .6; } }
   #tts.on { color: var(--ink); border-color: var(--ink); }
+  #drawer.wide .panel { width: min(600px, 100%); }
+  h3.sec { margin: 0; padding: 14px 16px 4px; font: 600 .75rem system-ui, sans-serif; letter-spacing: .06em;
+           text-transform: uppercase; color: var(--accent); }
+  .hbtn { min-width: 34px; }
   .share { display: flex; gap: 10px; align-items: flex-start; padding: 12px 16px; border-bottom: 1px solid var(--line);
            font-family: system-ui, sans-serif; font-size: .85rem; color: var(--muted); cursor: pointer; }
   .share input { margin-top: 2px; accent-color: var(--accent); }
@@ -92,7 +96,7 @@
   .seg button + button { border-left: 1px solid var(--line); }
   .seg button.on { background: var(--accent); color: #fff; }
   .fam { color: var(--accent); font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; margin-right: 4px; }
-  @media (max-width: 520px) { header small { display: none; } .hbtn { padding: 4px 7px; } }
+  @media (max-width: 520px) { header small { display: none; } .hbtn { padding: 4px 6px; min-width: 30px; } }
   .mem { display: block; margin-top: 6px; font: .75rem system-ui, sans-serif; color: var(--muted); font-style: italic; }
   .voice { display: block; margin-top: 6px; font: .75rem system-ui, sans-serif; color: var(--muted); }
   .voice.play { color: var(--accent); cursor: pointer; }
@@ -113,9 +117,10 @@
   <div><h1>Ten<span>,</span> druhý</h1><small>hlas, co ti radí, i když nechceš</small></div>
   <div class="actions">
     <button id="tts" class="hbtn" title="Číst odpovědi nahlas">🔈</button>
-    <button id="mem" class="hbtn" title="Co si o tobě pamatuju">paměť</button>
-    <button id="hist" class="hbtn" title="Předchozí konverzace">historie</button>
-    <button id="reset" class="hbtn" title="Začít novou konverzaci (stará zůstane uložená)">nová</button>
+    <button id="mem" class="hbtn" title="Co si o tobě pamatuju (paměť, připomínky)">🧠</button>
+    <button id="hist" class="hbtn" title="Předchozí konverzace">🕘</button>
+    <button id="cfg" class="hbtn" title="Nastavení">⚙</button>
+    <button id="reset" class="hbtn" title="Nová konverzace (stará zůstane uložená)">✚</button>
   </div>
 </header>
 <div id="drawer" aria-hidden="true">
@@ -253,8 +258,15 @@ async function keysRow() {
   const box = document.createElement('div'); box.className = 'share'; box.style.cssText = 'flex-direction:column;cursor:default';
   let keys = [];
   try { keys = await (await fetch('api/keys')).json(); } catch (e) {}
-  const head = document.createElement('div'); head.textContent = '🔑 API klíče (pro Home Assistant, n8n, skripty – http://tendruhy:8000/v1):';
-  box.appendChild(head);
+  const api = location.origin + '/v1';
+  const head = document.createElement('div'); head.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+  const url = document.createElement('code'); url.textContent = api; url.style.color = 'var(--ink)';
+  const cp = document.createElement('button'); cp.className = 'hbtn'; cp.type = 'button'; cp.textContent = 'kopírovat';
+  cp.onclick = () => navigator.clipboard && navigator.clipboard.writeText(api).then(() => { cp.textContent = 'zkopírováno'; });
+  head.append('Adresa (OpenAI-kompatibilní):', url, cp);
+  const hint = document.createElement('small');
+  hint.textContent = 'Model „ten-druhy“, hlavička Authorization: Bearer <klíč>. Klíč patří tobě – platí tvoje paměť, kalendář a připomínky.';
+  box.append(head, hint);
   for (const k of keys) {
     const r = document.createElement('div'); r.style.cssText = 'display:flex;gap:8px;align-items:center';
     const t = document.createElement('span'); t.style.flex = '1';
@@ -338,31 +350,16 @@ async function pushToggle() {
 }
 
 async function openMemory() {
-  dtitle.textContent = 'Paměť a nastavení';
-  drawer.classList.add('open'); convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
-  let st = { share_family: false, items: [] };
+  dtitle.textContent = 'Co o tobě vím';
+  drawer.classList.remove('wide'); drawer.classList.add('open');
+  convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
+  let st = { items: [] };
   try { st = await (await fetch('api/memories')).json(); } catch (e) {}
   convs.innerHTML = '';
-  const share = document.createElement('label'); share.className = 'share';
-  const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = st.share_family;
-  const txt = document.createElement('span');
-  txt.textContent = 'Sdílet rodinné věci (děti, partner, společné akce) s ostatními v rodině, kteří to mají taky zapnuté.';
-  cb.onchange = async () => {
-    await fetch('api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ share_family: cb.checked }) }).catch(() => {});
-    openMemory();
-  };
-  share.append(cb, txt);
-  convs.appendChild(tonePicker(st.tone, st.tone_locked));
-  convs.appendChild(calendarRow(st.calendar || {}));
-  convs.appendChild(await pushToggle());
-  convs.appendChild(share);
-  convs.appendChild(await keysRow());
   let rems = [];
   try { rems = await (await fetch('api/reminders')).json(); } catch (e) {}
   if (rems.length) {
-    const h = document.createElement('div'); h.className = 'share'; h.style.cursor = 'default';
-    h.textContent = '⏰ Připomínky (řekni mi „připomeň mi…“):'; convs.appendChild(h);
+    section('Připomínky');
     for (const r of rems) {
       const row = document.createElement('div'); row.className = 'conv'; row.style.cursor = 'default';
       const t = document.createElement('div'); t.className = 't';
@@ -374,6 +371,7 @@ async function openMemory() {
       row.appendChild(del); convs.appendChild(row);
     }
   }
+  section('Co si pamatuju');
   if (!st.items.length) {
     convs.insertAdjacentHTML('beforeend', '<p class="empty" style="margin-top:2em">Zatím nic. Musíš mi něco říct, chytráku.</p>');
     return;
@@ -394,11 +392,38 @@ async function openMemory() {
     convs.appendChild(row);
   }
 }
+function section(title, ...rows) {
+  const h = document.createElement('h3'); h.className = 'sec'; h.textContent = title;
+  convs.appendChild(h); rows.forEach(r => convs.appendChild(r));
+}
+
+async function openSettings() {
+  dtitle.textContent = 'Nastavení';
+  drawer.classList.add('open', 'wide');
+  convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
+  let st = { share_family: false, items: [] };
+  try { st = await (await fetch('api/memories')).json(); } catch (e) {}
+  convs.innerHTML = '';
+  const share = document.createElement('label'); share.className = 'share';
+  const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = st.share_family;
+  const txt = document.createElement('span');
+  txt.textContent = 'Sdílet rodinné věci (děti, partner, společné akce) s ostatními v rodině, kteří to mají taky zapnuté.';
+  cb.onchange = () => fetch('api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ share_family: cb.checked }) }).catch(() => {});
+  share.append(cb, txt);
+  section('Jak se mnou mluvit', tonePicker(st.tone, st.tone_locked));
+  section('Upozornění', await pushToggle());
+  section('Kalendář', calendarRow(st.calendar || {}));
+  section('Rodina', share);
+  section('API (Home Assistant, n8n, skripty)', await keysRow());
+}
+document.getElementById('cfg').onclick = openSettings;
+
 document.getElementById('mem').onclick = openMemory;
 
 async function openHistory() {
   dtitle.textContent = 'Na co jsme už mysleli';
-  drawer.classList.add('open'); convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
+  drawer.classList.remove('wide'); drawer.classList.add('open'); convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
   let list = [];
   try { list = await (await fetch('api/conversations')).json(); } catch (e) {}
   convs.innerHTML = list.length ? '' : '<p class="empty" style="margin-top:2em">Zatím nic. Jsi docela nudnej.</p>';
