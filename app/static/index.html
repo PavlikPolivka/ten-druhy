@@ -424,6 +424,7 @@ async function openSettings() {
   section('Upozornění', await pushToggle());
   section('Kalendář', calendarRow(st.calendar || {}));
   section('Deník',
+    toggleRow('Ráno (7:00, o víkendu 9:00) ti řeknu, co tě dnes čeká a jaké bude počasí.', 'brief', st.brief),
     toggleRow('Večer (kolem 20:30) se zeptám, jak jsi přežil den. Co mi řekneš, si zapamatuju.', 'journal', st.journal),
     toggleRow('V neděli večer ti shrnu týden a mrknu na ten příští.', 'weekly', st.weekly));
   section('Rodina', share);

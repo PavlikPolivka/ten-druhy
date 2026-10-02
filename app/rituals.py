@@ -3,17 +3,18 @@
 Run from the scheduler loop (app/checkins.py). Each lands as a new conversation started by him (+ push if the user
 has it), at most once per day / week (sent log).
 
-  python -m app.rituals journal|weekly --user pavel   # force one now (testing)
+  python -m app.rituals journal|weekly|brief --user pavel   # force one now (testing)
 """
 
 import json
 import sys
 from datetime import datetime, timedelta, timezone
 
-from app import calendar_ics, llm, memory, push, sessions
+from app import calendar_ics, llm, memory, push, sessions, web
 from app.prompt import DAYS, MONTHS, TZ, now_line
 
 JOURNAL_AT = (20, 30)
+BRIEF_AT = {0: (7, 0), 1: (7, 0), 2: (7, 0), 3: (7, 0), 4: (7, 0), 5: (9, 0), 6: (9, 0)}  # weekday -> (h, m)
 WEEKLY_AT = (6, 18, 30)  # Sunday 18:30
 QUIET_AFTER_ACTIVITY_H = 1
 
@@ -25,6 +26,9 @@ VOICE = ("Jsi „Ten druhý“ – cynický vnitřní hlas uživatele z knih Ji�
          "humorem, ale jde ti o něj. Nikdy si nevymýšlej fakta, která nejsou v podkladech.")
 JOURNAL_SYSTEM = VOICE + (" Je večer a ty se ho ptáš, jak proběhl den – jako vnitřní hlas, co to chce vědět. "
                           "1–2 krátké věty. Když dnes měl něco konkrétního (kalendář, paměť), zeptej se na to.")
+BRIEF_SYSTEM = VOICE + (" Je ráno a ty mu dáváš ranní přehled: co ho dnes čeká (kalendář, věci z paměti s dnešním datem) "
+                        "a jaké bude počasí, s praktickým dopadem (bunda, deštník, kolo). 2–4 krátké věty, konkrétní časy. "
+                        "Když nic naplánovaného nemá, řekni to po svém.")
 WEEKLY_SYSTEM = VOICE + (" Je neděle večer: shrň mu jeho týden (4–6 vět, co se dělo, co zvládl, co visí) a jednou větou "
                          "se podívej na příští týden. Vlastní slova, žádné odrážky, žádné nadpisy.")
 
@@ -37,7 +41,7 @@ def _q(sql: str, args: tuple = ()) -> list[tuple]:
         sessions.db().executescript(SCHEMA)
         memory._db()
         cols = [r[1] for r in sessions.db().execute("PRAGMA table_info(users)")]
-        for col in ("journal", "weekly"):
+        for col in ("journal", "weekly", "brief"):
             if col not in cols:
                 sessions.db().execute(f"ALTER TABLE users ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0")
         _ready = True
@@ -45,12 +49,12 @@ def _q(sql: str, args: tuple = ()) -> list[tuple]:
 
 
 def settings(user: str) -> dict:
-    rows = _q("SELECT journal, weekly FROM users WHERE user = ?", (user,))
-    return {"journal": bool(rows and rows[0][0]), "weekly": bool(rows and rows[0][1])}
+    rows = _q("SELECT journal, weekly, brief FROM users WHERE user = ?", (user,))
+    return {"journal": bool(rows and rows[0][0]), "weekly": bool(rows and rows[0][1]), "brief": bool(rows and rows[0][2])}
 
 
 def set_setting(user: str, kind: str, on: bool):
-    assert kind in ("journal", "weekly")
+    assert kind in ("journal", "weekly", "brief")
     _q(f"INSERT INTO users(user, {kind}) VALUES (?, ?) ON CONFLICT(user) DO UPDATE SET {kind} = excluded.{kind}",
        (user, int(on)))
 
@@ -83,6 +87,24 @@ def journal(user: str) -> str:
     text = llm.generate(JOURNAL_SYSTEM, ctx, temperature=0.9, patient=False).strip() or "Tak co dneska? Přežili jsme?"
     title = f"Deník – {DAYS[today.weekday()]} {today.day}. {today.month}."
     return _deliver(user, "journal", today.isoformat(), title, text)
+
+
+def brief(user: str) -> str:
+    today = datetime.now(TZ).date()
+    try:
+        cal = calendar_ics.summary(user, today, today + timedelta(days=1)) if calendar_ics.url(user) else ""
+    except Exception:
+        cal = ""
+    try:
+        weather = web.weather()
+    except Exception:
+        weather = "(počasí se nepodařilo načíst)"
+    ctx = (f"Teď je: {now_line()}\n\nDnešní kalendář:\n{cal or '(nic / nepropojený)'}\n\n"
+           f"Co o něm víš (hledej, co je na dnešek):\n{_facts(user)}\n\nPočasí:\n{weather}")
+    text = llm.generate(BRIEF_SYSTEM, ctx, temperature=0.8, patient=False).strip()
+    if not text:
+        raise RuntimeError("empty brief")
+    return _deliver(user, "brief", today.isoformat(), f"Ráno – {DAYS[today.weekday()]} {today.day}. {today.month}.", text)
 
 
 def weekly(user: str) -> str:
@@ -119,6 +141,15 @@ def _active_recently(user: str) -> bool:
 def tick():
     """Called every scheduler tick; sends what's due."""
     now = datetime.now(TZ)
+    if (now.hour, now.minute) >= BRIEF_AT[now.weekday()] and now.hour < 12:
+        for user in _users("brief"):
+            if not _q("SELECT 1 FROM rituals_sent WHERE user = ? AND kind = 'brief' AND period = ?",
+                      (user, now.date().isoformat())):
+                try:
+                    brief(user)
+                    print(f"  [ritual] brief -> {user}", flush=True)
+                except Exception as e:
+                    print(f"  [ritual] brief {user}: {str(e)[:100]}", flush=True)
     if (now.hour, now.minute) >= JOURNAL_AT and now.hour < 23:
         for user in _users("journal"):
             if not _q("SELECT 1 FROM rituals_sent WHERE user = ? AND kind = 'journal' AND period = ?",
@@ -143,5 +174,5 @@ def tick():
 if __name__ == "__main__":
     args = sys.argv[1:]
     who = args[args.index("--user") + 1] if "--user" in args else "local"
-    cid = journal(who) if args and args[0] == "journal" else weekly(who)
+    cid = {"journal": journal, "brief": brief}.get(args[0] if args else "", weekly)(who)
     print(json.dumps(sessions.messages(cid), ensure_ascii=False, indent=1))

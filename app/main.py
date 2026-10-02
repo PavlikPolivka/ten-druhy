@@ -249,6 +249,7 @@ class SettingsIn(BaseModel):
     ical_url: str | None = Field(default=None, max_length=2000)  # "" disconnects
     journal: bool | None = None
     weekly: bool | None = None
+    brief: bool | None = None
 
 
 @app.post("/api/settings")
@@ -258,7 +259,7 @@ def settings(body: SettingsIn, request: Request):
         memory.set_share_family(user, body.share_family)
     if body.tone is not None and not memory.set_tone(user, body.tone):
         raise HTTPException(400, "tone not allowed")
-    for kind in ("journal", "weekly"):
+    for kind in ("journal", "weekly", "brief"):
         if getattr(body, kind) is not None:
             rituals.set_setting(user, kind, getattr(body, kind))
     if body.ical_url is not None:

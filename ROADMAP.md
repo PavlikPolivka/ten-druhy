@@ -26,7 +26,7 @@ per-model daily quotas), 2-core homelab box, identity comes from Authelia (`Remo
 | 17 | **Calendar** – Google Calendar via each user's secret iCal URL; feeds replies, check-ins, brief | 1–2 h | ✅ done |
 | 18 | **OpenAI-compatible API** – `/v1/chat/completions` + `/v1/audio/speech` (Piper), token auth, for HA Assist / n8n / scripts on the `portal` network (replaces 10b) | 1–2 h | ✅ done |
 | 19 | **Journal & weekly review** – evening question, Sunday recap from memory | 1–2 h | ✅ done |
-| 21 | **Morning brief** – today's events (calendar + memory) + weather for Buštěhrad; 7:00 weekdays, 9:00 weekends | 2 h | |
+| 21 | **Morning brief** – today's events (calendar + memory) + weather for Buštěhrad; 7:00 weekdays, 9:00 weekends | 2 h | ✅ done |
 | 24 | **Homelab watchdog** – alerts in his voice: backups, disk/RAM/load, containers down/looping, certs/tunnel/OS updates | 2–3 h | |
 | 25 | **Home Assistant** – control + sensors + announce on speakers (was #11) | 2–3 h | |
 | 26 | **Kulhánek adventure** – interactive text adventure in the books' world, he narrates | 2–3 h | |

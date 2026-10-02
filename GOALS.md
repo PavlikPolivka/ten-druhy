@@ -142,7 +142,11 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Sunday from 18:30 weekly review: this week's memories + conversation titles + next week's calendar
   - [x] Sent log (`rituals_sent`) → at most once per day / week; driven by the existing 10-min scheduler loop
   - [x] Tested: forced journal + weekly, tick dedupe (0 when already sent, exactly 1 after clearing the log)
-- [ ] 21. Morning brief (events + weather Buštěhrad; 7:00 weekdays, 9:00 weekends)
+- [x] 21. Morning brief (events + weather Buštěhrad; 7:00 weekdays, 9:00 weekends)
+  - [x] Opt-in `brief` per user (⚙ Nastavení → Deník)
+  - [x] Content: today's calendar + dated memories for today + Open-Meteo weather (home place), in his voice, 2–4 sentences
+  - [x] 7:00 Mon–Fri, 9:00 Sat–Sun (until noon); once per day; conversation "Ráno – <den>" + push
+  - [x] Tested forced run
 - [ ] 24. Homelab watchdog (backups, disk/resources, containers, certs & updates)
 - [ ] 25. Home Assistant control
 - [ ] 26. Kulhánek adventure
