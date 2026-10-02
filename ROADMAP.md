@@ -1,6 +1,6 @@
 # Roadmap
 
-Worked top to bottom. Effort = rough build+deploy time. Constraints: Gemini free tier (embeddings 1000/day,
+Worked top to bottom; progress and sub-tasks are tracked in [GOALS.md](GOALS.md). Effort = rough build+deploy time. Constraints: Gemini free tier (embeddings 1000/day,
 per-model daily quotas), 2-core homelab box, identity comes from Authelia (`Remote-User` / `Remote-Name`).
 
 | # | Feature | Effort | Status |
