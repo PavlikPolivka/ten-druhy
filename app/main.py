@@ -12,11 +12,11 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import apikeys, calendar_ics, checkins, config, rituals, llm, memory, push, reminders, retrieval, router, sessions, tools, tts, web
+from app import apikeys, calendar_ics, checkins, config, rituals, watchdog, llm, memory, push, reminders, retrieval, router, sessions, tools, tts, web
 from app.prompt import system_prompt
 
 STATIC = Path(__file__).parent / "static"
-app = FastAPI(title="Ten druhý", on_startup=[checkins.start, reminders.start])
+app = FastAPI(title="Ten druhý", on_startup=[checkins.start, reminders.start, watchdog.start])
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 

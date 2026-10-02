@@ -148,6 +148,17 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] 7:00 Mon–Fri, 9:00 Sat–Sun (until noon); once per day; conversation "Ráno – <den>" + push
   - [x] Tested forced run
 - [ ] 24. Homelab watchdog (backups, disk/resources, containers, certs & updates)
+  - [x] Read-only collector on the host (`host/tendruhy-hoststatus.py`, systemd timer 5 min, root) → host.json:
+        restic log, disks, RAM/load, all containers (state/health/restarts), apt updates, public reachability, cert expiry
+  - [x] App only reads host.json (no Docker socket, no host access); admins = `ADMIN_USERS` (default pavel)
+  - [x] Rules: backup errors/hung/older than 26 h, disk ≥ 85 %, RAM < 8 %, load15 > 2×CPU, container that was running
+        stops / restart-loops / unhealthy (intentionally stopped ones ignored), site unreachable, cert < 14 days,
+        security updates, reboot required, stale collector
+  - [x] De-dup: alert once, repeat after 24 h, "vyřešeno" with current values when it clears; message in his voice
+  - [x] Tool `homelab_status` (admins only): "jak je na tom server?"
+  - [x] Tested on real host data + simulated disk/container/restic problems (found and fixed: crashed container
+        auto-"resolved" next tick; invented numbers in the resolved message; stale health on stopped containers)
+  - [ ] User installs the collector: `sudo bash /tmp/tendruhy-host/install.sh`
 - [ ] 25. Home Assistant control
 - [ ] 26. Kulhánek adventure
 - [ ] 27. Family chat

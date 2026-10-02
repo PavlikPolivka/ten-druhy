@@ -38,6 +38,9 @@ TONE_LOCK = dict(p.split(":", 1) for p in os.getenv("TONE_LOCK", "").split(",") 
 # Shared secret Caddy adds as X-TD-Proxy; when set, only /v1 and /healthz work without it. Empty = off.
 PROXY_SECRET = os.getenv("TD_PROXY_SECRET", "")
 
+# Admins (Authelia usernames): homelab watchdog alerts + server tools.
+ADMIN_USERS = [u for u in os.getenv("ADMIN_USERS", "pavel").split(",") if u]
+
 # Home for weather questions without a place, and the morning brief.
 HOME_PLACE = os.getenv("HOME_PLACE", "Buštěhrad")
 
@@ -49,6 +52,7 @@ DERIVED_DIR = Path(os.getenv("DERIVED_DIR", ROOT / "data" / "derived"))
 PROMPTS_DIR = ROOT / "prompts"
 SESSIONS_DB = Path(os.getenv("SESSIONS_DB", ROOT / "data" / "sessions.sqlite"))
 PIPER_DIR = Path(os.getenv("PIPER_DIR", SESSIONS_DB.parent / "piper"))
+HOST_JSON = Path(os.getenv("HOST_JSON", SESSIONS_DB.parent / "host.json"))  # written by host/tendruhy-hoststatus.py
 
 TOP_K = int(os.getenv("TOP_K", "6"))
 HISTORY_TOKENS = int(os.getenv("HISTORY_TOKENS", "8000"))
