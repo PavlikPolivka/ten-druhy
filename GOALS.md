@@ -61,6 +61,9 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Frontend: play Gemini audio, fall back to browser voice on error/quota; iOS audio unlock in the tap
   - [x] `TTS_VOICE` / `TTS_MODELS` / `TTS_STYLE` in config (default Charon)
   - [x] Deployed; fallback verified on the server (3.8 rate-limited → 2.5 preview answered in 4 s)
+  - [x] No style prompt (it was read aloud by 2.5 and caused an English accent: "rvat" instead of "řvát")
+  - [x] Status in the reply bubble: "chystám hlas…" while generating, "mluví · zastavit" while playing
+  - [x] 🔊 replay button next to 👍/👎 on every reply
   - [ ] User picks the voice from ~/Downloads/ten-druhy-voices (Algenib, Charon, Orus, Zubenelgenubi)
   - [ ] Verify playback on iOS / Android
 - [ ] 10. Proactive check-ins

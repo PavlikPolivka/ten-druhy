@@ -87,6 +87,11 @@
   .share input { margin-top: 2px; accent-color: var(--accent); }
   .fam { color: var(--accent); font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; margin-right: 4px; }
   @media (max-width: 520px) { header small { display: none; } .hbtn { padding: 4px 7px; } }
+  .voice { display: block; margin-top: 6px; font: .75rem system-ui, sans-serif; color: var(--muted); }
+  .voice.play { color: var(--accent); cursor: pointer; }
+  .voice i { font-style: normal; animation: blink 1.2s infinite; }
+  .voice i:nth-child(2) { animation-delay: .2s; } .voice i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
   .rate { display: flex; gap: 2px; margin: -8px 0 14px 4px; }
   .rate button { background: none; border: 0; padding: 2px 6px; font-size: .85rem; opacity: .35; filter: grayscale(1);
                  border-radius: 6px; }
@@ -153,6 +158,9 @@ function addRating(el, id, rating) {
     };
     bar.appendChild(b);
   }
+  const say = document.createElement('button'); say.type = 'button'; say.textContent = '🔊'; say.title = 'Přečíst nahlas';
+  say.onclick = () => { unlockAudio(); speak(el.dataset.text || '', el); };
+  bar.appendChild(say);
   el.after(bar);
 }
 
@@ -166,7 +174,7 @@ async function loadState() {
       log.innerHTML = '';
       for (const m of st.messages) {
         const el = bubble(m.role === 'user' ? 'me' : 'him', m.content, m.image ? 'api/images/' + m.image : null);
-        if (m.role === 'assistant') addRating(el, m.id, m.rating);
+        if (m.role === 'assistant') { el.dataset.text = m.content; addRating(el, m.id, m.rating); }
       }
     }
   } catch (e) {}
@@ -324,32 +332,49 @@ let speakSeq = 0;
 
 function unlockAudio() { player.src = SILENCE; player.play().catch(() => {}); }
 
+// Status line inside the reply bubble: "chystám hlas…" while TTS generates, "mluví · zastavit" while playing.
+let voiceTag = null;
+function setVoiceTag(el, state) {
+  if (!voiceTag && el && state) { voiceTag = document.createElement('span'); voiceTag.className = 'voice'; el.appendChild(voiceTag); }
+  if (!voiceTag) return;
+  if (!state) { voiceTag.remove(); voiceTag = null; return; }
+  voiceTag.className = 'voice ' + state;
+  voiceTag.innerHTML = state === 'gen' ? '🔊 chystám hlas<i>.</i><i>.</i><i>.</i>' : '🔊 mluví · <u>zastavit</u>';
+  voiceTag.onclick = state === 'play' ? stopSpeaking : null;
+}
+
 function stopSpeaking() {
   speakSeq++; player.pause();
   if (synth) synth.cancel();
+  setVoiceTag(null, null);
 }
 
-function browserSpeak(text) {
-  if (!synth) return;
+function browserSpeak(text, seq) {
+  if (!synth) { setVoiceTag(null, null); return; }
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'cs-CZ'; if (voice) u.voice = voice;
   u.rate = 1.05; u.pitch = 0.8;  // a bit lower and drier
+  u.onend = u.onerror = () => { if (seq === speakSeq) setVoiceTag(null, null); };
+  setVoiceTag(null, 'play');
   synth.speak(u);
 }
 
 // His real voice (Gemini TTS, ~5 s to generate); browser voice if the server can't (quota, offline).
-async function speak(text) {
+async function speak(text, el) {
   if (!text) return;
   stopSpeaking(); const seq = speakSeq;
+  setVoiceTag(el, 'gen');
   try {
     const r = await fetch('api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
     if (!r.ok) throw new Error('tts ' + r.status);
     const url = URL.createObjectURL(await r.blob());
     if (seq !== speakSeq) { URL.revokeObjectURL(url); return; }  // user moved on meanwhile
-    player.src = url; player.onended = () => URL.revokeObjectURL(url);
+    player.src = url;
+    player.onended = () => { URL.revokeObjectURL(url); if (seq === speakSeq) setVoiceTag(null, null); };
     await player.play();
+    if (seq === speakSeq) setVoiceTag(null, 'play');
   } catch (e) {
-    if (seq === speakSeq) browserSpeak(text);
+    if (seq === speakSeq) browserSpeak(text, seq);
   }
 }
 
@@ -408,7 +433,7 @@ form.onsubmit = async e => {
                         if (!got) him.textContent = ''; him.appendChild(s); }
         if (ev.done && ev.sources && ev.sources.length) { const s = document.createElement('span'); s.className = 'src';
                         s.textContent = 'vzpomínky z: ' + ev.sources.join(', '); him.appendChild(s); }
-        if (ev.done) { addRating(him, ev.message_id, null); if (speakReply) speak(got); }
+        if (ev.done) { him.dataset.text = got; addRating(him, ev.message_id, null); if (speakReply) speak(got, him); }
       }
     }
   } catch (err) {
