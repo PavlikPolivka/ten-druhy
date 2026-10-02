@@ -32,6 +32,13 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [ ] Verify on iOS Safari / installed PWA and Android Chrome
   - Note: Apple's only Czech system voice is female (Zuzana) — proper voice comes with #9
 - [ ] 7. Long-term memory
+  - [ ] `memories` table (user, scope user|family, text) + `users` table (share_family opt-in)
+  - [ ] Extractor: Flash-Lite in a background thread every 2 new user messages; sees existing memories and
+        returns add/update/delete ops as JSON; relative dates ("zítra") resolved to absolute ones
+  - [ ] Inject "Co o něm víš" (own + family if opted in) into the per-request prompt tail, capped
+  - [ ] Persona rule: use memories naturally, never recite them
+  - [ ] "paměť" panel: list, delete single facts, family-sharing toggle
+  - [ ] Test: facts extracted, updated (not duplicated), deleted; isolation between users
 - [ ] 8. Photos
 - [ ] 9. Better voice (Gemini TTS)
 - [ ] 10. Proactive check-ins
