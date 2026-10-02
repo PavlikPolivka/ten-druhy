@@ -23,11 +23,14 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Auto titles by Flash-Lite in a background thread after the first exchange
   - [x] History drawer: resume, two-step delete
   - [ ] Verify drawer on a phone
-- [ ] 6. Voice, basic
-  - [ ] Mic button using the Web Speech API (`cs-CZ`), interim text into the input, auto-send on stop
-  - [ ] Read replies aloud with `speechSynthesis` (pick a Czech voice), per-device on/off toggle
-  - [ ] Hide the mic where speech recognition isn't supported (Firefox); check iOS Safari / installed PWA
-  - [ ] Stop speaking when a new message is sent
+- [x] 6. Voice, basic
+  - [x] Mic button using the Web Speech API (`cs-CZ`), interim text into the input, auto-send on stop
+  - [x] Read replies aloud with `speechSynthesis` (Czech voice, slightly lower pitch), 🔈/🔊 toggle per device
+  - [x] Spoken question → spoken answer even with the toggle off
+  - [x] Mic hidden where speech recognition isn't supported (Firefox); iOS audio unlocked within the tap
+  - [x] Stop speaking when a new message is sent or the mic is pressed
+  - [ ] Verify on iOS Safari / installed PWA and Android Chrome
+  - Note: Apple's only Czech system voice is female (Zuzana) — proper voice comes with #9
 - [ ] 7. Long-term memory
 - [ ] 8. Photos
 - [ ] 9. Better voice (Gemini TTS)

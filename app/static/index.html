@@ -69,6 +69,11 @@
   .conv .del { background: none; border: 0; color: var(--muted); font-size: .8rem; padding: 4px 6px; border-radius: 6px;
                font-family: system-ui, sans-serif; }
   .conv .del.arm { color: #fff; background: var(--accent); }
+  #mic { background: var(--panel); border: 1px solid var(--line); color: var(--ink); border-radius: 10px;
+         width: 46px; font-size: 1.1rem; display: none; }
+  #mic.on { background: var(--accent); color: #fff; border-color: var(--accent); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .6; } }
+  #tts.on { color: var(--ink); border-color: var(--ink); }
   .rate { display: flex; gap: 2px; margin: -8px 0 14px 4px; }
   .rate button { background: none; border: 0; padding: 2px 6px; font-size: .85rem; opacity: .35; filter: grayscale(1);
                  border-radius: 6px; }
@@ -82,6 +87,7 @@
 <header>
   <div><h1>Ten<span>,</span> druhý</h1><small>hlas, co ti radí, i když nechceš</small></div>
   <div class="actions">
+    <button id="tts" class="hbtn" title="Číst odpovědi nahlas">🔈</button>
     <button id="hist" class="hbtn" title="Předchozí konverzace">historie</button>
     <button id="reset" class="hbtn" title="Začít novou konverzaci (stará zůstane uložená)">nová</button>
   </div>
@@ -95,6 +101,7 @@
 </div>
 <div id="log"><p class="empty">No? Tak co chceš?</p></div>
 <form id="f">
+  <button id="mic" type="button" title="Mluvit (podrž si myšlenky)">🎙</button>
   <textarea id="q" rows="1" placeholder="Napiš mu něco…" autofocus></textarea>
   <button id="send" type="submit">Poslat</button>
 </form>
@@ -195,9 +202,69 @@ document.getElementById('reset').onclick = () => {
   q.focus();
 };
 
+// ---- Voice (browser-only: Web Speech API, no extra API quota) ----
+const synth = window.speechSynthesis;
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const ttsBtn = document.getElementById('tts'), mic = document.getElementById('mic');
+let ttsOn = false, dictated = false, voice = null;
+try { ttsOn = localStorage.getItem('td_tts') === '1'; } catch (e) {}
+
+function pickVoice() {
+  if (!synth) return;
+  const cs = synth.getVoices().filter(v => v.lang && v.lang.toLowerCase().startsWith('cs'));
+  // Prefer a male-ish / higher quality Czech voice when the platform has several.
+  voice = cs.find(v => /premium|enhanced|natural/i.test(v.name)) || cs.find(v => /google/i.test(v.name)) || cs[0] || null;
+}
+if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; } else { ttsBtn.style.display = 'none'; }
+
+function renderTts() { ttsBtn.textContent = ttsOn ? '🔊' : '🔈'; ttsBtn.classList.toggle('on', ttsOn); }
+renderTts();
+ttsBtn.onclick = () => {
+  ttsOn = !ttsOn; renderTts();
+  try { localStorage.setItem('td_tts', ttsOn ? '1' : '0'); } catch (e) {}
+  if (!ttsOn && synth) synth.cancel();
+};
+
+function speak(text) {
+  if (!synth || !text) return;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'cs-CZ'; if (voice) u.voice = voice;
+  u.rate = 1.05; u.pitch = 0.8;  // a bit lower and drier
+  synth.speak(u);
+}
+
+if (Recognition) {
+  mic.style.display = 'block';
+  let rec = null, finalText = '';
+  mic.onclick = () => {
+    if (rec) { rec.stop(); return; }  // second tap: stop and send
+    if (synth) synth.cancel();
+    rec = new Recognition();
+    rec.lang = 'cs-CZ'; rec.interimResults = true; rec.continuous = false;
+    finalText = ''; mic.classList.add('on'); q.placeholder = 'Poslouchám…';
+    rec.onresult = ev => {
+      let interim = '';
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        if (ev.results[i].isFinal) finalText += ev.results[i][0].transcript; else interim += ev.results[i][0].transcript;
+      }
+      q.value = (finalText + interim).trim(); q.dispatchEvent(new Event('input'));
+    };
+    rec.onerror = ev => { if (ev.error === 'not-allowed') q.placeholder = 'Mikrofon je zakázaný.'; };
+    rec.onend = () => {
+      rec = null; mic.classList.remove('on'); q.placeholder = 'Napiš mu něco…';
+      if (q.value.trim()) { dictated = true; form.requestSubmit(); }
+    };
+    rec.start();
+  };
+}
+
 form.onsubmit = async e => {
   e.preventDefault();
   const text = q.value.trim(); if (!text || send.disabled) return;
+  // Spoken question -> spoken answer, even with the speaker toggle off.
+  const speakReply = ttsOn || dictated; dictated = false;
+  if (synth) { synth.cancel(); if (speakReply) synth.speak(new SpeechSynthesisUtterance(''));  /* unlocks iOS audio within the gesture */ }
   q.value = ''; q.style.height = 'auto'; send.disabled = true;
   bubble('me', text);
   const him = bubble('him', '…'); let got = '';
@@ -220,7 +287,7 @@ form.onsubmit = async e => {
                         if (!got) him.textContent = ''; him.appendChild(s); }
         if (ev.done && ev.sources && ev.sources.length) { const s = document.createElement('span'); s.className = 'src';
                         s.textContent = 'vzpomínky z: ' + ev.sources.join(', '); him.appendChild(s); }
-        if (ev.done) addRating(him, ev.message_id, null);
+        if (ev.done) { addRating(him, ev.message_id, null); if (speakReply) speak(got); }
       }
     }
   } catch (err) {
