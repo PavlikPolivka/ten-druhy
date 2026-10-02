@@ -54,13 +54,15 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Found on the way: quoted catchphrases in the persona rules got reused every message → removed,
         added a "no repeating hooks" rule
   - [ ] Verify camera/picker on a phone
-- [ ] 9. Better voice (Gemini TTS)
+- [x] 9. Better voice (Gemini TTS)
   - [x] Probe: free tier works (`gemini-3.8-flash-tts` returns WAV, ~5 s; `gemini-2.5-flash-preview-tts` returns PCM);
         limit 3 requests/min per model; a Czech style instruction gets read aloud, an English one doesn't
-  - [ ] Voice samples in ~/Downloads/ten-druhy-voices → user picks the voice
-  - [ ] `/api/tts` (text → WAV): style prefix, TTS model chain, PCM wrapped to WAV, small LRU cache
-  - [ ] Frontend: play Gemini audio, fall back to browser voice on error/quota; iOS audio unlock in the tap
-  - [ ] `TTS_VOICE` / `TTS_MODELS` in config
+  - [x] `/api/tts` (text → WAV): English style prefix, TTS model chain (3.8 → 2.5 preview), PCM wrapped to WAV, LRU cache
+  - [x] Frontend: play Gemini audio, fall back to browser voice on error/quota; iOS audio unlock in the tap
+  - [x] `TTS_VOICE` / `TTS_MODELS` / `TTS_STYLE` in config (default Charon)
+  - [x] Deployed; fallback verified on the server (3.8 rate-limited → 2.5 preview answered in 4 s)
+  - [ ] User picks the voice from ~/Downloads/ten-druhy-voices (Algenib, Charon, Orus, Zubenelgenubi)
+  - [ ] Verify playback on iOS / Android
 - [ ] 10. Proactive check-ins
 - [ ] 11. Home Assistant
 - [ ] 12. Real-time voice (Gemini Live)

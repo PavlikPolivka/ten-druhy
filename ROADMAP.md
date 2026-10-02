@@ -13,7 +13,7 @@ per-model daily quotas), 2-core homelab box, identity comes from Authelia (`Remo
 | 6 | **Voice, basic** – mic (browser speech recognition) + read replies aloud (speechSynthesis) | 1–2 h | ✅ done |
 | 7 | **Long-term memory** – Flash-Lite extracts durable facts per conversation into a per-user memory table, injected into the prompt; view/delete page; opt-in shared family layer | 2–4 h | ✅ done |
 | 8 | **Photos** – send a picture, he comments (Gemini multimodal) | 1–2 h | ✅ done |
-| 9 | **Better voice** – Gemini TTS (`gemini-3.8-flash-tts`) with a gravelly cynical voice; check free quota | 2–3 h | |
+| 9 | **Better voice** – Gemini TTS (`gemini-3.8-flash-tts`) with a gravelly cynical voice; check free quota | 2–3 h | ✅ done |
 | 10 | **Proactive check-ins** – web push (needs #3) + memory (#7) + scheduler: "Tak co, přežili jsme ten deploy?" | 3–4 h | |
 | 11 | **Home Assistant** – comments on house state / speaks through a speaker | 2–3 h | |
 | 12 | **Real-time voice** – Gemini Live (`gemini-3.1-flash-live-preview`), WebSocket proxy through Caddy | 1 day+ | |
