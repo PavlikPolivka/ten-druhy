@@ -73,8 +73,9 @@ def _due(user: str) -> str | None:
                 " WHERE c.user = ? AND m.role = 'user'", (user,))
     if active and _hours_since(active[0][0]) < ACTIVE_COOLDOWN_H:
         return "user active recently"
-    if not memory.visible(user):
-        return "nothing in memory"
+    from app import calendar_ics
+    if not memory.visible(user) and not calendar_ics.url(user):
+        return "nothing in memory or calendar"
     return None
 
 
@@ -87,7 +88,15 @@ def evaluate(user: str, force: bool = False) -> dict:
     recent = _q("SELECT ts, message FROM checkins WHERE user = ? AND sent = 1 ORDER BY id DESC LIMIT 5", (user,))
     recent_txt = "\n".join(f"- {ts} UTC: {m}" for ts, m in recent) or "(zatím nikdy)"
     titles = "\n".join(f"- {c['title'] or c['preview']} ({c['updated']} UTC)" for c in sessions.conversations(user, 5)) or "(nic)"
-    user_msg = (f"Teď je: {now_line()}\n\nCo o něm víš:\n{facts}\n\nPoslední konverzace:\n{titles}\n\n"
+    from app import calendar_ics
+    from datetime import timedelta
+    today = datetime.now(TZ).date()
+    try:
+        cal = calendar_ics.summary(user, today, today + timedelta(days=2)) if calendar_ics.url(user) else ""
+    except Exception:
+        cal = ""
+    user_msg = (f"Teď je: {now_line()}\n\nCo o něm víš:\n{facts}\n\nKalendář (dnes a zítra):\n{cal or '(nic / nepropojený)'}\n\n"
+                f"Poslední konverzace:\n{titles}\n\n"
                 f"Poslední tvoje ozvání:\n{recent_txt}")
     from app.prompt import TONE_RULES
     system = DECIDE_SYSTEM + ("\n\n" + TONE_RULES[memory.tone(user)[0]] if memory.tone(user)[0] in TONE_RULES else "")

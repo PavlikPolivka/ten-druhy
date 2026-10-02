@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import checkins, llm, memory, push, reminders, retrieval, router, sessions, tools, tts, web
+from app import calendar_ics, checkins, llm, memory, push, reminders, retrieval, router, sessions, tools, tts, web
 from app.prompt import system_prompt
 
 STATIC = Path(__file__).parent / "static"
@@ -128,7 +128,8 @@ def delete_conversation(cid: str, request: Request):
 def list_memories(request: Request):
     user = _user(request)
     t, locked = memory.tone(user)
-    return {"share_family": memory.shares_family(user), "tone": t, "tone_locked": locked, "items": memory.visible(user)}
+    return {"share_family": memory.shares_family(user), "tone": t, "tone_locked": locked, "items": memory.visible(user),
+            "calendar": calendar_ics.status(user)}
 
 
 @app.get("/api/reminders")
@@ -210,6 +211,7 @@ def speak(body: TtsIn):
 class SettingsIn(BaseModel):
     share_family: bool | None = None
     tone: str | None = None
+    ical_url: str | None = Field(default=None, max_length=2000)  # "" disconnects
 
 
 @app.post("/api/settings")
@@ -219,6 +221,12 @@ def settings(body: SettingsIn, request: Request):
         memory.set_share_family(user, body.share_family)
     if body.tone is not None and not memory.set_tone(user, body.tone):
         raise HTTPException(400, "tone not allowed")
+    if body.ical_url is not None:
+        try:
+            calendar_ics.set_url(user, body.ical_url.strip())
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        return {"ok": True, "calendar": calendar_ics.status(user)}
     return {"ok": True}
 
 
@@ -277,7 +285,8 @@ def chat(body: ChatIn, request: Request):
             done = tools.run(user, r.actions)
             chunks = _search(r.book_query) if r.books else []
             outside, links = _outside(r)
-            system = system_prompt(chunks, name, memory.prompt_block(user), outside, memory.tone(user)[0], done)
+            mem_block = "\n\n".join(b for b in (memory.prompt_block(user), calendar_ics.prompt_block(user)) if b)
+            system = system_prompt(chunks, name, mem_block, outside, memory.tone(user)[0], done)
             text_in = body.message.strip() or "(posílá ti fotku, bez komentáře)"
             convo = prev + [{"role": "user", "content": text_in, "image": (img, "image/jpeg") if img else None}]
             reply = []

@@ -111,7 +111,13 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Reminders listed in the panel with two-step cancel
   - [x] Tested: "zítra v 8 zavolat mámě", "za minutu…" (fired on time), list, cancel by description
   - [x] Tool results carry full details (cancel said "tu dnešní v pět" when it only got an id)
-- [ ] 17. Calendar (Google iCal URL)
+- [x] 17. Calendar (Google iCal URL)
+  - [x] Per-user secret iCal URL saved from the settings panel (https only, write-only – never sent back, can be disconnected)
+  - [x] Fetch + parse with `icalendar` + `recurring_ical_events` (recurring expanded, all-day, UTC → Prague), 10 min cache
+  - [x] Today + tomorrow always in the per-request prompt tail; tool `calendar_lookup(from, to)` (max 62 days)
+  - [x] Check-ins see the next 2 days of events (and run for users with a calendar even without memories)
+  - [x] Tested with a generated .ics: "co mám zítra", "kdy mám zubaře", "příští týden", small talk unaffected
+  - [ ] Real calendar connected by the user
 - [ ] 18. OpenAI-compatible API + voice (replaces 10b)
 - [ ] 19. Journal & weekly review
 - [ ] 20. Jellyfin

@@ -219,6 +219,35 @@ function b64ToBytes(b64) {
   return Uint8Array.from(raw, c => c.charCodeAt(0));
 }
 
+// Secret iCal URL: write-only from here (never shown back), the server only reports status.
+function calendarRow(cal) {
+  const row = document.createElement('div'); row.className = 'share tone';
+  const label = document.createElement('span');
+  const info = document.createElement('small');
+  const render = c => {
+    row.innerHTML = ''; label.textContent = '📅 Kalendář: ';
+    if (c.connected) {
+      info.textContent = c.error ? 'propojený, ale nejde načíst (' + c.error + ')' : 'propojený ✓ (' + c.next7 + ' událostí v příštích 7 dnech)';
+      const off = document.createElement('button'); off.className = 'hbtn'; off.type = 'button'; off.textContent = 'odpojit';
+      off.onclick = () => save('');
+      row.append(label, info, off);
+    } else {
+      const inp = document.createElement('input'); inp.type = 'password'; inp.placeholder = 'tajná adresa ve formátu iCal (https://calendar.google.com/…)';
+      inp.autocomplete = 'off'; inp.style.cssText = 'flex:1;min-width:180px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink)';
+      const ok = document.createElement('button'); ok.className = 'hbtn'; ok.type = 'button'; ok.textContent = 'propojit';
+      ok.onclick = () => inp.value.trim() && save(inp.value.trim());
+      info.textContent = c.msg || '';
+      row.append(label, inp, ok, info);
+    }
+  };
+  const save = async v => {
+    const r = await fetch('api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ical_url: v }) });
+    const d = await r.json().catch(() => ({}));
+    render(r.ok ? d.calendar : { connected: false, msg: d.detail || 'nepovedlo se' });
+  };
+  render(cal); return row;
+}
+
 const TONES = [['full', 'naplno'], ['mild', 'mírně'], ['kid', 'pro děti']];
 function tonePicker(current, locked) {
   const row = document.createElement('div'); row.className = 'share tone';
@@ -295,6 +324,7 @@ async function openMemory() {
   };
   share.append(cb, txt);
   convs.appendChild(tonePicker(st.tone, st.tone_locked));
+  convs.appendChild(calendarRow(st.calendar || {}));
   convs.appendChild(await pushToggle());
   convs.appendChild(share);
   let rems = [];
