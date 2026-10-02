@@ -22,6 +22,10 @@ TTS_MODELS = [m for m in os.getenv("TTS_MODELS", "gemini-3.8-flash-tts,gemini-2.
 TTS_VOICE = os.getenv("TTS_VOICE", "Charon")
 TTS_STYLE = os.getenv("TTS_STYLE", "")
 
+# Local Czech voice (Piper, CC0 dataset) after Gemini TTS runs out; empty PIPER_VOICE disables it.
+PIPER_VOICE = os.getenv("PIPER_VOICE", "cs_CZ-jirka-medium")
+PIPER_LENGTH_SCALE = float(os.getenv("PIPER_LENGTH_SCALE", "0.9"))  # <1 = faster
+
 QDRANT_URL = os.getenv("QDRANT_URL", "")  # empty -> embedded local Qdrant at data/qdrant
 QDRANT_PATH = ROOT / "data" / "qdrant"
 COLLECTION = os.getenv("COLLECTION", "kulhanek")
@@ -29,6 +33,7 @@ COLLECTION = os.getenv("COLLECTION", "kulhanek")
 DERIVED_DIR = Path(os.getenv("DERIVED_DIR", ROOT / "data" / "derived"))
 PROMPTS_DIR = ROOT / "prompts"
 SESSIONS_DB = Path(os.getenv("SESSIONS_DB", ROOT / "data" / "sessions.sqlite"))
+PIPER_DIR = Path(os.getenv("PIPER_DIR", SESSIONS_DB.parent / "piper"))
 
 TOP_K = int(os.getenv("TOP_K", "6"))
 HISTORY_TOKENS = int(os.getenv("HISTORY_TOKENS", "8000"))

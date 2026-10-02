@@ -122,7 +122,8 @@ class TtsIn(BaseModel):
 @app.post("/api/tts")
 def speak(body: TtsIn):
     try:
-        return Response(tts.synthesize(body.text), media_type="audio/wav")
+        audio, engine = tts.synthesize(body.text)
+        return Response(audio, media_type="audio/wav", headers={"X-TTS-Engine": engine})
     except Exception:
         raise HTTPException(503, "tts unavailable")  # the browser falls back to its own voice
 

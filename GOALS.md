@@ -66,6 +66,11 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] 🔊 replay button next to 👍/👎 on every reply
   - [ ] User picks the voice from ~/Downloads/ten-druhy-voices (Algenib, Charon, Orus, Zubenelgenubi)
   - [ ] Verify playback on iOS / Android
+- [ ] 9b. Local Czech voice (Piper) – Gemini TTS is capped at 10/day per model
+  - [ ] `piper-tts` in the image; `cs_CZ-jirka-medium` downloaded on first use into the data volume (not baked into the public image)
+  - [ ] `/api/tts` chain: Gemini (best) → Piper (unlimited, local) → browser voice
+  - [ ] Skip Gemini TTS for the rest of the day once its daily quota is hit (no wasted round-trips)
+  - [ ] Check speed and memory on the 2-core server
 - [ ] 10. Proactive check-ins
 - [ ] 11. Home Assistant
 - [ ] 12. Real-time voice (Gemini Live)
