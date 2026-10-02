@@ -120,6 +120,11 @@ def _loop():
             memory.sweep()
         except Exception as e:
             print(f"  [memory] sweep: {str(e)[:100]}", flush=True)
+        try:
+            from app import rituals
+            rituals.tick()
+        except Exception as e:
+            print(f"  [ritual] {str(e)[:100]}", flush=True)
         for user in push.users():
             try:
                 r = evaluate(user)

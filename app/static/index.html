@@ -392,6 +392,15 @@ async function openMemory() {
     convs.appendChild(row);
   }
 }
+function toggleRow(label, key, on) {
+  const row = document.createElement('label'); row.className = 'share';
+  const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!on;
+  const txt = document.createElement('span'); txt.textContent = label;
+  cb.onchange = () => fetch('api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ [key]: cb.checked }) }).catch(() => {});
+  row.append(cb, txt); return row;
+}
+
 function section(title, ...rows) {
   const h = document.createElement('h3'); h.className = 'sec'; h.textContent = title;
   convs.appendChild(h); rows.forEach(r => convs.appendChild(r));
@@ -414,6 +423,9 @@ async function openSettings() {
   section('Jak se mnou mluvit', tonePicker(st.tone, st.tone_locked));
   section('Upozornění', await pushToggle());
   section('Kalendář', calendarRow(st.calendar || {}));
+  section('Deník',
+    toggleRow('Večer (kolem 20:30) se zeptám, jak jsi přežil den. Co mi řekneš, si zapamatuju.', 'journal', st.journal),
+    toggleRow('V neděli večer ti shrnu týden a mrknu na ten příští.', 'weekly', st.weekly));
   section('Rodina', share);
   section('API (Home Assistant, n8n, skripty)', await keysRow());
 }

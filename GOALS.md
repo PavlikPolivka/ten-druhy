@@ -135,7 +135,13 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] ⚙ Nastavení as its own wide screen: tone, notifications, calendar, family, API (domain URL + copy, key list)
   - [x] 🧠 panel only reminders + memory; header as icons (🔈 🧠 🕘 ⚙ ✚)
   - [x] Public API tested with the user's own key via curl (models, chat with his memory, stream, speech)
-- [ ] 19. Journal & weekly review
+- [x] 19. Journal & weekly review
+  - [x] Per-user opt-ins `journal` / `weekly` (users table), toggles in ⚙ Nastavení → Deník
+  - [x] Evening question from 20:30 (skipped if the user wrote in the last hour), tailored from today's calendar + memory;
+        lands as "Deník – <den>" conversation (+ push); answers feed memory as usual
+  - [x] Sunday from 18:30 weekly review: this week's memories + conversation titles + next week's calendar
+  - [x] Sent log (`rituals_sent`) → at most once per day / week; driven by the existing 10-min scheduler loop
+  - [x] Tested: forced journal + weekly, tick dedupe (0 when already sent, exactly 1 after clearing the log)
 - [ ] 20. Jellyfin
 - [ ] 21. Morning brief (events + weather Buštěhrad; 7:00 weekdays, 9:00 weekends)
 - [ ] 24. Homelab watchdog (backups, disk/resources, containers, certs & updates)

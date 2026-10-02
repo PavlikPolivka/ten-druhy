@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import apikeys, calendar_ics, checkins, config, llm, memory, push, reminders, retrieval, router, sessions, tools, tts, web
+from app import apikeys, calendar_ics, checkins, config, rituals, llm, memory, push, reminders, retrieval, router, sessions, tools, tts, web
 from app.prompt import system_prompt
 
 STATIC = Path(__file__).parent / "static"
@@ -145,7 +145,7 @@ def list_memories(request: Request):
     user = _user(request)
     t, locked = memory.tone(user)
     return {"share_family": memory.shares_family(user), "tone": t, "tone_locked": locked, "items": memory.visible(user),
-            "calendar": calendar_ics.status(user)}
+            "calendar": calendar_ics.status(user), **rituals.settings(user)}
 
 
 @app.get("/api/keys")
@@ -247,6 +247,8 @@ class SettingsIn(BaseModel):
     share_family: bool | None = None
     tone: str | None = None
     ical_url: str | None = Field(default=None, max_length=2000)  # "" disconnects
+    journal: bool | None = None
+    weekly: bool | None = None
 
 
 @app.post("/api/settings")
@@ -256,6 +258,9 @@ def settings(body: SettingsIn, request: Request):
         memory.set_share_family(user, body.share_family)
     if body.tone is not None and not memory.set_tone(user, body.tone):
         raise HTTPException(400, "tone not allowed")
+    for kind in ("journal", "weekly"):
+        if getattr(body, kind) is not None:
+            rituals.set_setting(user, kind, getattr(body, kind))
     if body.ical_url is not None:
         try:
             calendar_ics.set_url(user, body.ical_url.strip())
