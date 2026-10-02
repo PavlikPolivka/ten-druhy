@@ -84,7 +84,8 @@ def _contents(history: list[dict]) -> list[types.Content]:
     ]
 
 
-def generate(system: str, user: str, model: str | None = None, json_mode: bool = False, temperature: float = 0.3) -> str:
+def generate(system: str, user: str, model: str | None = None, json_mode: bool = False, temperature: float = 0.3,
+             patient: bool = True) -> str:
     cfg = types.GenerateContentConfig(
         system_instruction=system,
         temperature=temperature,
@@ -92,11 +93,11 @@ def generate(system: str, user: str, model: str | None = None, json_mode: bool =
         response_mime_type="application/json" if json_mode else None,
         automatic_function_calling=NO_AFC,
     )
-    # Batch scripts: be patient (several rounds across the fallback chain).
+    # Batch scripts are patient (several rounds across the chain); interactive callers fail fast.
     resp = _with_fallback(
         _chain(model or config.EXTRACT_MODEL),
         lambda m: client().models.generate_content(model=m, contents=user, config=cfg),
-        attempts=3, rounds=5,
+        attempts=3 if patient else 1, rounds=5 if patient else 1,
     )
     return resp.text or ""
 

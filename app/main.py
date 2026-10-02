@@ -3,12 +3,12 @@
 import json
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import llm, retrieval, sessions
+from app import llm, retrieval, router, sessions
 from app.prompt import system_prompt
 
 STATIC = Path(__file__).parent / "static"
@@ -19,6 +19,16 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 class ChatIn(BaseModel):
     session_id: str = Field(min_length=8, max_length=64)
     message: str = Field(min_length=1, max_length=4000)
+
+
+def _user_name(request: Request) -> str:
+    """Display name forwarded by Authelia via Caddy (copy_headers). Headers arrive latin-1 decoded."""
+    raw = request.headers.get("remote-name") or request.headers.get("remote-user") or ""
+    try:
+        raw = raw.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
+    return raw.split()[0] if raw.strip() else ""
 
 
 def _sse(obj: dict) -> str:
@@ -36,16 +46,17 @@ def healthz():
 
 
 @app.post("/api/chat")
-def chat(body: ChatIn):
+def chat(body: ChatIn, request: Request):
     prev = sessions.history(body.session_id)
-    # Short follow-ups ("a pak?") retrieve poorly alone; include the previous user turn.
     last_user = next((m["content"] for m in reversed(prev) if m["role"] == "user"), "")
-    query = f"{last_user}\n{body.message}" if len(body.message) < 60 else body.message
+    name = _user_name(request)
 
     def events():
         try:
-            chunks = retrieval.search(query)
-            system = system_prompt(chunks)
+            # Only pull book excerpts when the message is actually about the books.
+            about_books, query = router.route(last_user, body.message)
+            chunks = retrieval.search(query) if about_books else []
+            system = system_prompt(chunks, name)
             convo = prev + [{"role": "user", "content": body.message}]
             reply = []
             for piece in llm.stream_chat(system, convo):
