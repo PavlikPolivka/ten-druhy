@@ -65,21 +65,31 @@ def embed_missing():
             time.sleep(PAUSE_S)
 
 
+CHUNKS = config.DERIVED_DIR / "chunks.jsonl"  # shipped copy of data/text/chunks.jsonl (optional)
+
+
 def load():
+    """Embedded chunks get dense+sparse vectors; chunks not embedded yet get sparse only, so lexical
+    search already covers the whole corpus while the free-tier embedding quota catches up."""
     ensure_collection(recreate=True)
+    rows = {c["id"]: c for c in map(json.loads, VECTORS.open())} if VECTORS.exists() else {}
+    for src in (TEXT / "chunks.jsonl", CHUNKS):
+        if src.exists():
+            for c in map(json.loads, src.open()):
+                rows.setdefault(c["id"], c)
+            break
     points = []
-    for line in VECTORS.open():
-        c = json.loads(line)
-        dense = c.pop("dense")
+    for c in rows.values():
+        dense = c.pop("dense", None)
         idx, vals = sparse_vector(c["text"])
-        points.append(models.PointStruct(
-            id=str(uuid.uuid5(uuid.NAMESPACE_URL, c["id"])),
-            vector={"dense": dense, "sparse": models.SparseVector(indices=idx, values=vals)},
-            payload=c,
-        ))
+        vector = {"sparse": models.SparseVector(indices=idx, values=vals)}
+        if dense:
+            vector["dense"] = dense
+        points.append(models.PointStruct(id=str(uuid.uuid5(uuid.NAMESPACE_URL, c["id"])), vector=vector, payload=c))
     for i in range(0, len(points), 256):
         qdrant().upsert(config.COLLECTION, points[i : i + 256])
-    print(f"loaded {len(points)} points into {config.COLLECTION}; count={qdrant().count(config.COLLECTION).count}")
+    n_dense = sum(1 for p in points if "dense" in p.vector)
+    print(f"loaded {len(points)} points ({n_dense} with dense vectors) into {config.COLLECTION}")
 
 
 if __name__ == "__main__":

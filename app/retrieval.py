@@ -31,7 +31,7 @@ def search(query: str, k: int = config.TOP_K, core_only: bool = False) -> list[d
     try:
         dense = llm.embed([query], query=True, retry=False)[0]
     except Exception as e:  # embedding quota gone: degrade to lexical-only search
-        print(f"  [retrieval] dense skipped: {e}", flush=True)
+        print(f"  [retrieval] dense skipped: {str(e)[:80]}", flush=True)
         dense = None
     idx, vals = sparse_vector(query)
     flt = models.Filter(must=[models.FieldCondition(key="core", match=models.MatchValue(value=True))]) if core_only else None
