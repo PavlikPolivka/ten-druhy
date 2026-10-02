@@ -53,6 +53,8 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Tested: reads text on a photo, photo-only message, other user / path traversal → 404, PNG rejected
   - [x] Found on the way: quoted catchphrases in the persona rules got reused every message → removed,
         added a "no repeating hooks" rule
+  - [x] Bug from real use: follow-ups ("o co v tom obrázku jde?") lost the photo → last 2 photos re-sent with history;
+        persona rule "you see his photos, read them exactly"
   - [ ] Verify camera/picker on a phone
 - [x] 9. Better voice (Gemini TTS)
   - [x] Probe: free tier works (`gemini-3.8-flash-tts` returns WAV, ~5 s; `gemini-2.5-flash-preview-tts` returns PCM);

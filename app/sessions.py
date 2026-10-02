@@ -149,16 +149,30 @@ def rated_exchanges() -> list[dict]:
     return [{"rating": r, "user": u, "ts": t, "reply": a, "message": m} for r, u, t, a, m in rows]
 
 
+RECENT_PHOTOS = 2  # photos re-sent with follow-ups ("o co v tom obrázku jde?"); ~260 tokens each for Gemini
+
+
 def history(conversation: str, budget_tokens: int = config.HISTORY_TOKENS) -> list[dict]:
-    """Most recent turns that fit the token budget, starting with a user turn (Gemini requires it)."""
-    out, used = [], 0
+    """Most recent turns that fit the token budget, starting with a user turn (Gemini requires it).
+
+    The last RECENT_PHOTOS photos travel along so follow-up questions can refer to them; older ones become a
+    "[poslal fotku]" placeholder.
+    """
+    out, used, photos = [], 0, 0
     for m in reversed(messages(conversation)):
         used += len(m["content"]) // 4
         if used > budget_tokens and out:
             break
-        # Past photos aren't re-sent (tokens); the model just knows one was there.
-        content = f"[poslal fotku] {m['content']}".strip() if m.get("image") else m["content"]
-        out.append({"role": m["role"], "content": content})
+        item = {"role": m["role"], "content": m["content"]}
+        if m.get("image"):
+            path = IMAGES / m["image"]
+            if photos < RECENT_PHOTOS and path.is_file():
+                item["image"] = (path.read_bytes(), "image/jpeg")
+                item["content"] = m["content"] or "(fotka)"
+                photos += 1
+            else:
+                item["content"] = f"[poslal fotku] {m['content']}".strip()
+        out.append(item)
     out.reverse()
     while out and out[0]["role"] != "user":
         out.pop(0)
