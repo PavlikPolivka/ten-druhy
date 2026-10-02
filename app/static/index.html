@@ -279,7 +279,7 @@ async function pushToggle() {
 }
 
 async function openMemory() {
-  dtitle.textContent = 'Co o tobě vím';
+  dtitle.textContent = 'Paměť a nastavení';
   drawer.classList.add('open'); convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
   let st = { share_family: false, items: [] };
   try { st = await (await fetch('api/memories')).json(); } catch (e) {}
@@ -297,6 +297,22 @@ async function openMemory() {
   convs.appendChild(tonePicker(st.tone, st.tone_locked));
   convs.appendChild(await pushToggle());
   convs.appendChild(share);
+  let rems = [];
+  try { rems = await (await fetch('api/reminders')).json(); } catch (e) {}
+  if (rems.length) {
+    const h = document.createElement('div'); h.className = 'share'; h.style.cursor = 'default';
+    h.textContent = '⏰ Připomínky (řekni mi „připomeň mi…“):'; convs.appendChild(h);
+    for (const r of rems) {
+      const row = document.createElement('div'); row.className = 'conv'; row.style.cursor = 'default';
+      const t = document.createElement('div'); t.className = 't';
+      const b = document.createElement('span'); b.textContent = r.text;
+      const sm = document.createElement('small'); sm.textContent = ' · ' + r.when;
+      t.append(b, sm); row.appendChild(t);
+      const del = document.createElement('button');
+      twoStep(del, 'zrušit', async () => { await fetch('api/reminders/' + r.id, { method: 'DELETE' }).catch(() => {}); row.remove(); });
+      row.appendChild(del); convs.appendChild(row);
+    }
+  }
   if (!st.items.length) {
     convs.insertAdjacentHTML('beforeend', '<p class="empty" style="margin-top:2em">Zatím nic. Musíš mi něco říct, chytráku.</p>');
     return;

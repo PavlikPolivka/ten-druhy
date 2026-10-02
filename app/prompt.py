@@ -63,7 +63,8 @@ TONE_RULES = {
 }
 
 
-def system_prompt(chunks: list[dict], user_name: str = "", memory: str = "", web: str = "", tone: str = "full") -> str:
+def system_prompt(chunks: list[dict], user_name: str = "", memory: str = "", web: str = "", tone: str = "full",
+                  done: list[str] | None = None) -> str:
     # Per-request tail goes after the stable prefix so implicit caching still hits.
     tail = [f"## Teď\nJe {now_line()}. Víš to, ale nekomentuj čas pořád – jen když se to hodí."]
     if user_name:
@@ -76,6 +77,10 @@ def system_prompt(chunks: list[dict], user_name: str = "", memory: str = "", web
     if web:
         tail.append("## Aktuální info zvenku (právě dohledané)\nPoužij to věcně a přesně (čísla, časy), "
                     "ale řekni to po svém. Když tam odpověď není, přiznej to.\n\n" + web)
+    if done:
+        tail.append("## Co jsi právě udělal (skutečně provedeno)\n" + "\n".join(f"- {d}" for d in done)
+                    + "\nPotvrď to po svém, konkrétně (kdy, co). Když je tam CHYBA, řekni to a co chybí. "
+                      "Nic jiného než tohle jsi neudělal – nic si nevymýšlej.")
     if tone in TONE_RULES:
         tail.append("## Tón pro tohohle člověka\n" + TONE_RULES[tone])
     # Last thing the model reads: weaker fallback models drift into long, book-heavy replies without it.

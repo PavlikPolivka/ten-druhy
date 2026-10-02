@@ -11,11 +11,11 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import checkins, llm, memory, push, retrieval, router, sessions, tts, web
+from app import checkins, llm, memory, push, reminders, retrieval, router, sessions, tools, tts, web
 from app.prompt import system_prompt
 
 STATIC = Path(__file__).parent / "static"
-app = FastAPI(title="Ten druhý", on_startup=[checkins.start])
+app = FastAPI(title="Ten druhý", on_startup=[checkins.start, reminders.start])
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
@@ -129,6 +129,20 @@ def list_memories(request: Request):
     user = _user(request)
     t, locked = memory.tone(user)
     return {"share_family": memory.shares_family(user), "tone": t, "tone_locked": locked, "items": memory.visible(user)}
+
+
+@app.get("/api/reminders")
+def list_reminders(request: Request):
+    return reminders.open_reminders(_user(request))
+
+
+@app.delete("/api/reminders/{rid}")
+def cancel_reminder(rid: int, request: Request):
+    try:
+        reminders.cancel(_user(request), {"id": rid})
+        return {"ok": True}
+    except ValueError:
+        return {"ok": False}
 
 
 @app.get("/api/memories/new")
@@ -259,10 +273,11 @@ def chat(body: ChatIn, request: Request):
         yield _sse({"conversation_id": cid, "memory_mark": memory.max_id()})
         try:
             # Only pull book excerpts when the message is actually about the books.
-            r = router.route(last_user, body.message) if body.message.strip() else router.Route()
+            r = router.route(last_user, body.message, user) if body.message.strip() else router.Route(actions=[])
+            done = tools.run(user, r.actions)
             chunks = _search(r.book_query) if r.books else []
             outside, links = _outside(r)
-            system = system_prompt(chunks, name, memory.prompt_block(user), outside, memory.tone(user)[0])
+            system = system_prompt(chunks, name, memory.prompt_block(user), outside, memory.tone(user)[0], done)
             text_in = body.message.strip() or "(posílá ti fotku, bez komentáře)"
             convo = prev + [{"role": "user", "content": text_in, "image": (img, "image/jpeg") if img else None}]
             reply = []
@@ -278,7 +293,7 @@ def chat(body: ChatIn, request: Request):
                 if not prev and not sessions.title(cid):
                     threading.Thread(target=_make_title, args=(cid, text_in, text), daemon=True).start()
             yield _sse({"done": True, "message_id": mid, "sources": sorted({c["book_title"] for c in chunks}),
-                        "links": links, "weather": r.weather})
+                        "links": links, "weather": r.weather, "actions": [d.split(":", 1)[0] for d in done]})
         except Exception as e:  # surface errors (e.g. free-tier quota) to the UI instead of a dead stream
             msg = str(e)
             if "429" in msg or "RESOURCE_EXHAUSTED" in msg:

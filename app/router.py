@@ -7,7 +7,8 @@ Flash-Lite call classifies instead. On any failure we fetch nothing; the lore bi
 import json
 from dataclasses import dataclass
 
-from app import config, llm
+from app import config, llm, tools
+from app.prompt import now_line
 
 SYSTEM = """Rozhoduješ, co si chatbot (postava Ten druhý z knih Jiřího Kulhánka) musí dohledat, než odpoví.
 
@@ -19,7 +20,8 @@ otevírací doby, ceny, zprávy, výsledky, události, program, konkrétní fakt
 „kdy hraje“, „co je nového“. NE pro běžný hovor, osobní věci, rady, názory, vtipy, pozdravy.
 
 Vrať JSON: {"books": bool, "book_query": "<krátký dotaz do knih>", "weather": bool, "place": "<obec, nebo prázdné \
-= domov>", "web": bool, "web_query": "<krátký vyhledávací dotaz česky, jako do vyhledávače>"}"""
+= domov>", "web": bool, "web_query": "<krátký vyhledávací dotaz česky, jako do vyhledávače>", \
+"actions": [{"tool": "<název nástroje>", ...argumenty}]}  (actions prázdné, když nic dělat nemá)"""
 
 
 @dataclass
@@ -30,15 +32,18 @@ class Route:
     place: str = ""
     web: bool = False
     web_query: str = ""
+    actions: list = None
 
 
-def route(previous_user: str, message: str) -> Route:
-    user = f"Předchozí zpráva uživatele: {previous_user or '-'}\nAktuální zpráva: {message}"
+def route(previous_user: str, message: str, user_id: str = "") -> Route:
+    user = (f"Teď je: {now_line()}\n{tools.router_block(user_id)}\n\n"
+            f"Předchozí zpráva uživatele: {previous_user or '-'}\nAktuální zpráva: {message}")
     try:
         o = json.loads(llm.generate(SYSTEM, user, model=config.EXTRACT_MODEL, json_mode=True, temperature=0, patient=False))
         return Route(books=bool(o.get("books")), book_query=o.get("book_query") or message,
                      weather=bool(o.get("weather")), place=(o.get("place") or "").strip(),
-                     web=bool(o.get("web")), web_query=o.get("web_query") or message)
+                     web=bool(o.get("web")), web_query=o.get("web_query") or message,
+                     actions=[a for a in (o.get("actions") or []) if isinstance(a, dict)])
     except Exception as e:  # quota, overload, bad JSON
         print(f"  [router] skipped: {e}", flush=True)
-        return Route()
+        return Route(actions=[])

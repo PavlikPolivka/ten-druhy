@@ -103,13 +103,14 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Mild initially still advised "vlep mu jednu" → explicit "no violent advice"
   - [x] Check-ins use the same tone
   - [ ] Set `TONE_LOCK` once the kids get Authelia accounts (today only `pavel` and `nikola` exist)
-- [ ] 16. Reminders
-  - [ ] Tools foundation: Gemini function calling in the chat loop (call → run → feed result → continue streaming),
-        tools registered per user with access rules, results logged
-  - [ ] Tools: `create_reminder(when, text)`, `list_reminders()`, `cancel_reminder(id)`; times resolved in Europe/Prague
-  - [ ] Scheduler fires due reminders as push + a message in a new conversation (like check-ins), in his voice
-  - [ ] Reminders visible in the paměť panel with cancel
-  - [ ] Test: "připomeň mi zítra v 8 zavolat mámě", "za 2 minuty", list, cancel, firing
+- [x] 16. Reminders
+  - [x] Native Gemini function calling = 429 on the free tier (like Search) → tools picked by the router call (JSON
+        mode) that runs anyway; the app executes them and the reply model confirms. Registry in `app/tools.py`
+  - [x] Tools: `reminder_create(when, text)`, `reminder_list`, `reminder_cancel(id)`; router gets now + open reminders
+  - [x] Firing thread (20 s): marks fired first (no doubles), message in his voice → new conversation + push
+  - [x] Reminders listed in the panel with two-step cancel
+  - [x] Tested: "zítra v 8 zavolat mámě", "za minutu…" (fired on time), list, cancel by description
+  - [x] Tool results carry full details (cancel said "tu dnešní v pět" when it only got an id)
 - [ ] 17. Calendar (Google iCal URL)
 - [ ] 18. OpenAI-compatible API + voice (replaces 10b)
 - [ ] 19. Journal & weekly review
