@@ -1,10 +1,12 @@
 """FastAPI app: static chat page + SSE chat endpoint. Auth is handled upstream (Caddy + Authelia)."""
 
+import base64
+import binascii
 import json
 import threading
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -133,13 +135,37 @@ def feedback(body: FeedbackIn, request: Request):
     return {"ok": sessions.rate(_user(request), body.message_id, body.rating)}
 
 
+@app.get("/api/images/{name}")
+def image(name: str, request: Request):
+    path = sessions.image_path(_user(request), name) if name.replace(".jpg", "").isalnum() else None
+    if not path:
+        raise HTTPException(404)
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=31536000"})
+
+
 class ChatIn(BaseModel):
     conversation_id: str | None = Field(default=None, max_length=64)
-    message: str = Field(min_length=1, max_length=4000)
+    message: str = Field(default="", max_length=4000)
+    image: str | None = Field(default=None, max_length=3_000_000)  # base64 JPEG, resized client-side
+
+
+def _decode_image(b64: str | None) -> bytes | None:
+    if not b64:
+        return None
+    try:
+        data = base64.b64decode(b64.split(",", 1)[-1], validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(400, "bad image")
+    if not data.startswith(b"\xff\xd8"):  # the client always re-encodes to JPEG
+        raise HTTPException(400, "image must be JPEG")
+    return data
 
 
 @app.post("/api/chat")
 def chat(body: ChatIn, request: Request):
+    img = _decode_image(body.image)
+    if not body.message.strip() and not img:
+        raise HTTPException(400, "empty message")
     user = _user(request)
     cid = body.conversation_id if sessions.owns(user, body.conversation_id) else sessions.create(user)
     prev = sessions.history(cid)
@@ -150,10 +176,11 @@ def chat(body: ChatIn, request: Request):
         yield _sse({"conversation_id": cid})
         try:
             # Only pull book excerpts when the message is actually about the books.
-            about_books, query = router.route(last_user, body.message)
+            about_books, query = router.route(last_user, body.message) if body.message.strip() else (False, "")
             chunks = _search(query) if about_books else []
             system = system_prompt(chunks, name, memory.prompt_block(user))
-            convo = prev + [{"role": "user", "content": body.message}]
+            text_in = body.message.strip() or "(posílá ti fotku, bez komentáře)"
+            convo = prev + [{"role": "user", "content": text_in, "image": (img, "image/jpeg") if img else None}]
             reply = []
             for piece in llm.stream_chat(system, convo):
                 reply.append(piece)
@@ -161,11 +188,11 @@ def chat(body: ChatIn, request: Request):
             text = "".join(reply).strip()
             mid = None
             if text:
-                sessions.add(cid, "user", body.message)
+                sessions.add(cid, "user", body.message.strip(), sessions.save_image(img) if img else None)
                 mid = sessions.add(cid, "assistant", text)
                 memory.extract_async(user, cid)
                 if not prev and not sessions.title(cid):
-                    threading.Thread(target=_make_title, args=(cid, body.message, text), daemon=True).start()
+                    threading.Thread(target=_make_title, args=(cid, text_in, text), daemon=True).start()
             yield _sse({"done": True, "message_id": mid, "sources": sorted({c["book_title"] for c in chunks})})
         except Exception as e:  # surface errors (e.g. free-tier quota) to the UI instead of a dead stream
             msg = str(e)

@@ -33,6 +33,8 @@ def db() -> sqlite3.Connection:
         if "session" in cols:  # pre-conversation schema (browser-scoped sessions): keep it aside
             _db.execute("ALTER TABLE messages RENAME TO messages_legacy")
         _db.executescript(SCHEMA)
+        if "image" not in [r[1] for r in _db.execute("PRAGMA table_info(messages)")]:
+            _db.execute("ALTER TABLE messages ADD COLUMN image TEXT")
     return _db
 
 
@@ -80,6 +82,8 @@ def title(conversation: str) -> str | None:
 def delete(user: str, conversation: str) -> bool:
     if not owns(user, conversation):
         return False
+    for (name,) in _q("SELECT image FROM messages WHERE conversation = ? AND image IS NOT NULL", (conversation,)):
+        (IMAGES / name).unlink(missing_ok=True)
     with _lock:
         db().execute("DELETE FROM feedback WHERE message_id IN (SELECT id FROM messages WHERE conversation = ?)", (conversation,))
         db().execute("DELETE FROM messages WHERE conversation = ?", (conversation,))
@@ -88,18 +92,37 @@ def delete(user: str, conversation: str) -> bool:
     return True
 
 
-def add(conversation: str, role: str, content: str) -> int:
+IMAGES = config.SESSIONS_DB.parent / "images"
+
+
+def save_image(data: bytes) -> str:
+    IMAGES.mkdir(parents=True, exist_ok=True)
+    name = uuid.uuid4().hex + ".jpg"
+    (IMAGES / name).write_bytes(data)
+    return name
+
+
+def image_path(user: str, name: str):
+    """Path of an image if it belongs to one of the user's conversations."""
+    ok = _q("SELECT 1 FROM messages m JOIN conversations c ON c.id = m.conversation WHERE m.image = ? AND c.user = ?",
+            (name, user))
+    p = IMAGES / name
+    return p if ok and p.is_file() else None
+
+
+def add(conversation: str, role: str, content: str, image: str | None = None) -> int:
     with _lock:
-        cur = db().execute("INSERT INTO messages(conversation, role, content) VALUES (?, ?, ?)", (conversation, role, content))
+        cur = db().execute("INSERT INTO messages(conversation, role, content, image) VALUES (?, ?, ?, ?)",
+                           (conversation, role, content, image))
         db().execute("UPDATE conversations SET updated = CURRENT_TIMESTAMP WHERE id = ?", (conversation,))
         db().commit()
         return cur.lastrowid
 
 
 def messages(conversation: str) -> list[dict]:
-    rows = _q("SELECT m.id, m.role, m.content, f.rating FROM messages m LEFT JOIN feedback f ON f.message_id = m.id"
-              " WHERE m.conversation = ? ORDER BY m.id", (conversation,))
-    return [{"id": i, "role": r, "content": c, "rating": f} for i, r, c, f in rows]
+    rows = _q("SELECT m.id, m.role, m.content, f.rating, m.image FROM messages m"
+              " LEFT JOIN feedback f ON f.message_id = m.id WHERE m.conversation = ? ORDER BY m.id", (conversation,))
+    return [{"id": i, "role": r, "content": c, "rating": f, "image": im} for i, r, c, f, im in rows]
 
 
 def rate(user: str, message_id: int, rating: int) -> bool:
@@ -133,7 +156,9 @@ def history(conversation: str, budget_tokens: int = config.HISTORY_TOKENS) -> li
         used += len(m["content"]) // 4
         if used > budget_tokens and out:
             break
-        out.append({"role": m["role"], "content": m["content"]})
+        # Past photos aren't re-sent (tokens); the model just knows one was there.
+        content = f"[poslal fotku] {m['content']}".strip() if m.get("image") else m["content"]
+        out.append({"role": m["role"], "content": content})
     out.reverse()
     while out and out[0]["role"] != "user":
         out.pop(0)

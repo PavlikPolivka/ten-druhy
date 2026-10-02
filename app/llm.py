@@ -97,10 +97,16 @@ def _with_fallback(models: list[str], call, attempts: int, rounds: int = 1):
 
 
 def _contents(history: list[dict]) -> list[types.Content]:
-    return [
-        types.Content(role="model" if m["role"] == "assistant" else "user", parts=[types.Part(text=m["content"])])
-        for m in history
-    ]
+    """Messages may carry {"image": (bytes, mime)}; the image goes before the text like a photo with a caption."""
+    out = []
+    for m in history:
+        parts = []
+        if m.get("image"):
+            data, mime = m["image"]
+            parts.append(types.Part.from_bytes(data=data, mime_type=mime))
+        parts.append(types.Part(text=m["content"]))
+        out.append(types.Content(role="model" if m["role"] == "assistant" else "user", parts=parts))
+    return out
 
 
 def generate(system: str, user: str, model: str | None = None, json_mode: bool = False, temperature: float = 0.3,

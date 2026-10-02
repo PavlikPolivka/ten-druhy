@@ -44,7 +44,16 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Found on the way: weaker fallback models (3.5-flash) went long and book-heavy → end-of-prompt
         reminder + chain reordered by voice quality
   - [ ] Verify the panel on a phone
-- [ ] 8. Photos
+- [x] 8. Photos
+  - [x] 📷 button: pick/take a photo, resized in the browser (max 1280 px JPEG) before upload, preview with ✕
+  - [x] `/api/chat` accepts an optional image (JPEG only); stored under `data/state/images/`, linked from the message row
+  - [x] Current photo sent to Gemini as inline image; older photos in history become "[poslal fotku]" (saves tokens)
+  - [x] Photos shown in the chat and in resumed conversations; `/api/images/{name}` checks ownership
+  - [x] Deleting a conversation deletes its photos
+  - [x] Tested: reads text on a photo, photo-only message, other user / path traversal → 404, PNG rejected
+  - [x] Found on the way: quoted catchphrases in the persona rules got reused every message → removed,
+        added a "no repeating hooks" rule
+  - [ ] Verify camera/picker on a phone
 - [ ] 9. Better voice (Gemini TTS)
 - [ ] 10. Proactive check-ins
 - [ ] 11. Home Assistant

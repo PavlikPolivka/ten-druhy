@@ -69,6 +69,14 @@
   .conv .del { background: none; border: 0; color: var(--muted); font-size: .8rem; padding: 4px 6px; border-radius: 6px;
                font-family: system-ui, sans-serif; }
   .conv .del.arm { color: #fff; background: var(--accent); }
+  #cam { background: var(--panel); border: 1px solid var(--line); color: var(--ink); border-radius: 10px;
+         width: 46px; font-size: 1.1rem; }
+  #pick { display: none; }
+  #preview { display: none; max-width: 760px; width: 100%; margin: 0 auto; padding: 8px 16px 0; }
+  #preview.on { display: flex; align-items: center; gap: 10px; }
+  #preview img { height: 64px; border-radius: 8px; border: 1px solid var(--line); }
+  #preview button { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; padding: 2px 8px; }
+  .msg img { display: block; max-width: 100%; max-height: 320px; border-radius: 8px; margin-bottom: 6px; }
   #mic { background: var(--panel); border: 1px solid var(--line); color: var(--ink); border-radius: 10px;
          width: 46px; font-size: 1.1rem; display: none; }
   #mic.on { background: var(--accent); color: #fff; border-color: var(--accent); animation: pulse 1.2s infinite; }
@@ -106,7 +114,10 @@
   </div>
 </div>
 <div id="log"><p class="empty">No? Tak co chceš?</p></div>
+<div id="preview"><img alt=""><button type="button" id="unpick" title="Odebrat fotku">✕</button></div>
 <form id="f">
+  <button id="cam" type="button" title="Poslat fotku">📷</button>
+  <input id="pick" type="file" accept="image/*">
   <button id="mic" type="button" title="Mluvit (podrž si myšlenky)">🎙</button>
   <textarea id="q" rows="1" placeholder="Napiš mu něco…" autofocus></textarea>
   <button id="send" type="submit">Poslat</button>
@@ -118,9 +129,11 @@ const log = document.getElementById('log'), q = document.getElementById('q'),
 // Conversations live on the server per Authelia user, so the same chat shows up on every device.
 let cid = null;
 
-function bubble(cls, text) {
+function bubble(cls, text, imgSrc) {
   const empty = log.querySelector('.empty'); if (empty) empty.remove();
-  const d = document.createElement('div'); d.className = 'msg ' + cls; d.textContent = text || '';
+  const d = document.createElement('div'); d.className = 'msg ' + cls;
+  if (imgSrc) { const im = document.createElement('img'); im.src = imgSrc; im.alt = 'fotka'; im.onload = () => { log.scrollTop = log.scrollHeight; }; d.appendChild(im); }
+  if (text) d.appendChild(document.createTextNode(text));
   log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
 }
 
@@ -152,7 +165,7 @@ async function loadState() {
     if (st.messages.length) {
       log.innerHTML = '';
       for (const m of st.messages) {
-        const el = bubble(m.role === 'user' ? 'me' : 'him', m.content);
+        const el = bubble(m.role === 'user' ? 'me' : 'him', m.content, m.image ? 'api/images/' + m.image : null);
         if (m.role === 'assistant') addRating(el, m.id, m.rating);
       }
     }
@@ -256,6 +269,31 @@ document.getElementById('reset').onclick = () => {
   q.focus();
 };
 
+// ---- Photos: resized in the browser to keep uploads (and Gemini tokens) small ----
+const pick = document.getElementById('pick'), preview = document.getElementById('preview');
+let photo = null;  // data URL (JPEG)
+document.getElementById('cam').onclick = () => pick.click();
+document.getElementById('unpick').onclick = () => { photo = null; preview.classList.remove('on'); pick.value = ''; };
+
+function resize(file, max = 1280) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      const k = Math.min(1, max / Math.max(im.width, im.height));
+      const c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); resolve(c.toDataURL('image/jpeg', 0.82));
+    };
+    im.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Tohle není obrázek.')); };
+    im.src = url;
+  });
+}
+pick.onchange = async () => {
+  const f = pick.files && pick.files[0]; if (!f) return;
+  try { photo = await resize(f); preview.querySelector('img').src = photo; preview.classList.add('on'); q.focus(); }
+  catch (e) { photo = null; preview.classList.remove('on'); }
+};
+
 // ---- Voice (browser-only: Web Speech API, no extra API quota) ----
 const synth = window.speechSynthesis;
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -315,16 +353,17 @@ if (Recognition) {
 
 form.onsubmit = async e => {
   e.preventDefault();
-  const text = q.value.trim(); if (!text || send.disabled) return;
+  const text = q.value.trim(); if ((!text && !photo) || send.disabled) return;
+  const img = photo; photo = null; preview.classList.remove('on'); pick.value = '';
   // Spoken question -> spoken answer, even with the speaker toggle off.
   const speakReply = ttsOn || dictated; dictated = false;
   if (synth) { synth.cancel(); if (speakReply) synth.speak(new SpeechSynthesisUtterance(''));  /* unlocks iOS audio within the gesture */ }
   q.value = ''; q.style.height = 'auto'; send.disabled = true;
-  bubble('me', text);
+  bubble('me', text, img);
   const him = bubble('him', '…'); let got = '';
   try {
     const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ conversation_id: cid, message: text }) });
+                                        body: JSON.stringify({ conversation_id: cid, message: text, image: img }) });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const reader = r.body.getReader(), dec = new TextDecoder(); let buf = '';
     while (true) {
