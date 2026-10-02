@@ -65,11 +65,13 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Status in the reply bubble: "chystám hlas…" while generating, "mluví · zastavit" while playing
   - [x] 🔊 replay button next to 👍/👎 on every reply
   - [ ] Verify playback on iOS / Android
-- [ ] 9b. Local Czech voice (Piper) – Gemini TTS is capped at 10/day per model
+- [x] 9b. Local Czech voice (Piper) – Gemini TTS is capped at 10/day per model
   - [x] `piper-tts` in the image; `cs_CZ-jirka-medium` downloaded on first use into the data volume (not baked into the public image)
   - [x] `/api/tts`: Piper only by default (user decision: skip Gemini TTS altogether); Gemini optional via `TTS_MODELS`
   - [x] If Gemini is enabled: skipped until its quota resets once the daily cap is hit
-  - [ ] Check speed and memory on the 2-core server
+  - [x] On the 2-core server: first request 7.2 s (one-time voice download), then ~2.4 s for a 10 s sentence;
+        container 235 MB of its 512 MB limit; image 612 MB
+  - [ ] Verify playback on phones
 - [ ] 10. Proactive check-ins
 - [ ] 11. Home Assistant
 - [ ] 12. Real-time voice (Gemini Live)
