@@ -2,11 +2,24 @@
 
 import json
 import re
+from datetime import datetime
 from functools import cache
+from zoneinfo import ZoneInfo
 
 from app import config
 
 N_SAMPLES = 60
+TZ = ZoneInfo("Europe/Prague")
+DAYS = ["pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota", "neděle"]
+MONTHS = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října",
+          "listopadu", "prosince"]
+
+
+def now_line(now: datetime | None = None) -> str:
+    now = now or datetime.now(TZ)
+    part = ("noc" if now.hour < 5 else "ráno" if now.hour < 9 else "dopoledne" if now.hour < 12 else
+            "odpoledne" if now.hour < 18 else "večer" if now.hour < 22 else "noc")
+    return f"{DAYS[now.weekday()]} {now.day}. {MONTHS[now.month - 1]} {now.year}, {now:%H:%M} ({part})"
 # A capitalized word after the first one = probably a character/place name; skip those samples.
 NAME = re.compile(r"(?<=[a-záčďéěíňóřšťúůýž,] )[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][a-záčďéěíňóřšťúůýž]+")
 
@@ -42,7 +55,8 @@ def stable_prefix() -> str:
 
 
 def system_prompt(chunks: list[dict], user_name: str = "") -> str:
-    tail = []
+    # Per-request tail goes after the stable prefix so implicit caching still hits.
+    tail = [f"## Teď\nJe {now_line()}. Víš to, ale nekomentuj čas pořád – jen když se to hodí."]
     if user_name:
         tail.append(f"## Čí jsi hlas\nTeď sedíš v hlavě člověka jménem {user_name}. Jménem ho/ji skoro nikdy neoslovuješ.")
     if chunks:

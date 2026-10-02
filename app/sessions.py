@@ -1,12 +1,27 @@
-"""Server-side conversation history in SQLite, trimmed to a token budget."""
+"""Conversation store (SQLite). Conversations belong to the Authelia user, so they follow them across devices."""
 
 import sqlite3
 import threading
+import uuid
 
 from app import config
 
 _lock = threading.Lock()
 _db: sqlite3.Connection | None = None
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY, user TEXT NOT NULL, title TEXT,
+    created DATETIME DEFAULT CURRENT_TIMESTAMP, updated DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX IF NOT EXISTS ix_conv_user ON conversations(user, updated);
+CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY, conversation TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL,
+    ts DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX IF NOT EXISTS ix_msg_conv ON messages(conversation, id);
+CREATE TABLE IF NOT EXISTS feedback (
+    message_id INTEGER PRIMARY KEY, user TEXT NOT NULL, rating INTEGER NOT NULL,
+    ts DATETIME DEFAULT CURRENT_TIMESTAMP);
+"""
 
 
 def db() -> sqlite3.Connection:
@@ -14,38 +29,83 @@ def db() -> sqlite3.Connection:
     if _db is None:
         config.SESSIONS_DB.parent.mkdir(parents=True, exist_ok=True)
         _db = sqlite3.connect(config.SESSIONS_DB, check_same_thread=False)
-        _db.execute(
-            "CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, session TEXT, role TEXT, content TEXT,"
-            " ts DATETIME DEFAULT CURRENT_TIMESTAMP)"
-        )
-        _db.execute("CREATE INDEX IF NOT EXISTS ix_session ON messages(session, id)")
+        cols = [r[1] for r in _db.execute("PRAGMA table_info(messages)")]
+        if "session" in cols:  # pre-conversation schema (browser-scoped sessions): keep it aside
+            _db.execute("ALTER TABLE messages RENAME TO messages_legacy")
+        _db.executescript(SCHEMA)
     return _db
 
 
-def add(session: str, role: str, content: str):
+def _q(sql: str, args: tuple = ()) -> list[tuple]:
     with _lock:
-        db().execute("INSERT INTO messages(session, role, content) VALUES (?, ?, ?)", (session, role, content))
+        cur = db().execute(sql, args)
+        rows = cur.fetchall()
         db().commit()
+        return rows
 
 
-def history(session: str, budget_tokens: int = config.HISTORY_TOKENS) -> list[dict]:
+def owns(user: str, conversation: str | None) -> bool:
+    return bool(conversation) and bool(_q("SELECT 1 FROM conversations WHERE id = ? AND user = ?", (conversation, user)))
+
+
+def create(user: str) -> str:
+    cid = uuid.uuid4().hex
+    _q("INSERT INTO conversations(id, user) VALUES (?, ?)", (cid, user))
+    return cid
+
+
+def latest(user: str) -> str | None:
+    rows = _q("SELECT id FROM conversations WHERE user = ? ORDER BY updated DESC LIMIT 1", (user,))
+    return rows[0][0] if rows else None
+
+
+def add(conversation: str, role: str, content: str) -> int:
     with _lock:
-        rows = db().execute(
-            "SELECT role, content FROM messages WHERE session = ? ORDER BY id DESC LIMIT 200", (session,)
-        ).fetchall()
+        cur = db().execute("INSERT INTO messages(conversation, role, content) VALUES (?, ?, ?)", (conversation, role, content))
+        db().execute("UPDATE conversations SET updated = CURRENT_TIMESTAMP WHERE id = ?", (conversation,))
+        db().commit()
+        return cur.lastrowid
+
+
+def messages(conversation: str) -> list[dict]:
+    rows = _q("SELECT m.id, m.role, m.content, f.rating FROM messages m LEFT JOIN feedback f ON f.message_id = m.id"
+              " WHERE m.conversation = ? ORDER BY m.id", (conversation,))
+    return [{"id": i, "role": r, "content": c, "rating": f} for i, r, c, f in rows]
+
+
+def rate(user: str, message_id: int, rating: int) -> bool:
+    """Thumbs up/down (1/-1, 0 clears) on one of the user's own assistant messages."""
+    ok = _q("SELECT 1 FROM messages m JOIN conversations c ON c.id = m.conversation"
+            " WHERE m.id = ? AND m.role = 'assistant' AND c.user = ?", (message_id, user))
+    if not ok:
+        return False
+    if rating:
+        _q("INSERT INTO feedback(message_id, user, rating) VALUES (?, ?, ?)"
+           " ON CONFLICT(message_id) DO UPDATE SET rating = excluded.rating, ts = CURRENT_TIMESTAMP",
+           (message_id, user, rating))
+    else:
+        _q("DELETE FROM feedback WHERE message_id = ?", (message_id,))
+    return True
+
+
+def rated_exchanges() -> list[dict]:
+    """Rated replies with the user message before them, for persona tuning."""
+    rows = _q("""SELECT f.rating, f.user, f.ts, a.content,
+                 (SELECT u.content FROM messages u WHERE u.conversation = a.conversation AND u.id < a.id
+                  AND u.role = 'user' ORDER BY u.id DESC LIMIT 1)
+                 FROM feedback f JOIN messages a ON a.id = f.message_id ORDER BY f.ts""")
+    return [{"rating": r, "user": u, "ts": t, "reply": a, "message": m} for r, u, t, a, m in rows]
+
+
+def history(conversation: str, budget_tokens: int = config.HISTORY_TOKENS) -> list[dict]:
+    """Most recent turns that fit the token budget, starting with a user turn (Gemini requires it)."""
     out, used = [], 0
-    for role, content in rows:
-        used += len(content) // 4
+    for m in reversed(messages(conversation)):
+        used += len(m["content"]) // 4
         if used > budget_tokens and out:
             break
-        out.append({"role": role, "content": content})
+        out.append({"role": m["role"], "content": m["content"]})
     out.reverse()
-    while out and out[0]["role"] != "user":  # Gemini wants the conversation to start with the user
+    while out and out[0]["role"] != "user":
         out.pop(0)
     return out
-
-
-def reset(session: str):
-    with _lock:
-        db().execute("DELETE FROM messages WHERE session = ?", (session,))
-        db().commit()

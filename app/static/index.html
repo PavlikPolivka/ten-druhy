@@ -2,8 +2,17 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ten druhý</title>
+<!-- use-credentials: the manifest fetch must carry the Authelia session cookie -->
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<link rel="icon" href="/static/icons/icon-192.png">
+<meta name="theme-color" content="#121110">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ten druhý">
 <style>
   :root {
     --bg: #f4f1ea; --panel: #fffdf8; --ink: #1d1b18; --muted: #6e675c;
@@ -15,6 +24,7 @@
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
+  body { height: 100dvh; }
   body { background: var(--bg); color: var(--ink); font: 16px/1.5 Georgia, "Iowan Old Style", serif;
          display: flex; flex-direction: column; }
   header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
@@ -41,12 +51,19 @@
              border: 1px solid var(--line); background: var(--panel); color: var(--ink); max-height: 30vh; }
   #send { background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 0 18px; }
   #send:disabled { opacity: .5; cursor: default; }
+  .rate { display: flex; gap: 2px; margin: -8px 0 14px 4px; }
+  .rate button { background: none; border: 0; padding: 2px 6px; font-size: .85rem; opacity: .35; filter: grayscale(1);
+                 border-radius: 6px; }
+  .rate button:hover { opacity: .8; }
+  .rate button.on { opacity: 1; filter: none; }
+  /* installed PWA on notched phones */
+  header { padding-top: calc(14px + env(safe-area-inset-top)); }
 </style>
 </head>
 <body>
 <header>
   <div><h1>Ten<span>,</span> druhý</h1><small>hlas, co ti radí, i když nechceš</small></div>
-  <button id="reset" title="Smazat historii a začít znovu">nová konverzace</button>
+  <button id="reset" title="Začít novou konverzaci (stará zůstane uložená)">nová konverzace</button>
 </header>
 <div id="log"><p class="empty">No? Tak co chceš?</p></div>
 <form id="f">
@@ -57,10 +74,8 @@
 const log = document.getElementById('log'), q = document.getElementById('q'),
       send = document.getElementById('send'), form = document.getElementById('f');
 
-function newId() { return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()).replace(/-/g, ''); }
-let sid;
-try { sid = localStorage.getItem('td_sid'); } catch (e) {}
-if (!sid) { sid = newId(); try { localStorage.setItem('td_sid', sid); } catch (e) {} }
+// Conversations live on the server per Authelia user, so the same chat shows up on every device.
+let cid = null;
 
 function bubble(cls, text) {
   const empty = log.querySelector('.empty'); if (empty) empty.remove();
@@ -68,13 +83,50 @@ function bubble(cls, text) {
   log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
 }
 
+// 👍/👎 under each of his replies; logged server-side for persona tuning.
+function addRating(el, id, rating) {
+  if (!id) return;
+  const bar = document.createElement('div'); bar.className = 'rate';
+  for (const [val, label, title] of [[1, '👍', 'Tohle sedí'], [-1, '👎', 'Tohle by Ten druhý neřekl']]) {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.title = title;
+    if (rating === val) b.classList.add('on');
+    b.onclick = async () => {
+      const next = b.classList.contains('on') ? 0 : val;
+      bar.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+      if (next) b.classList.add('on');
+      fetch('api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ message_id: id, rating: next }) }).catch(() => {});
+    };
+    bar.appendChild(b);
+  }
+  el.after(bar);
+}
+
+async function loadState() {
+  try {
+    const r = await fetch('api/state' + (cid ? '?conversation_id=' + encodeURIComponent(cid) : ''));
+    if (!r.ok) return;
+    const st = await r.json();
+    cid = st.conversation_id;
+    if (st.messages.length) {
+      log.innerHTML = '';
+      for (const m of st.messages) {
+        const el = bubble(m.role === 'user' ? 'me' : 'him', m.content);
+        if (m.role === 'assistant') addRating(el, m.id, m.rating);
+      }
+    }
+  } catch (e) {}
+}
+loadState();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+
 q.addEventListener('input', () => { q.style.height = 'auto'; q.style.height = q.scrollHeight + 'px'; });
 q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
 
-document.getElementById('reset').onclick = async () => {
-  await fetch('api/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: sid }) });
-  sid = newId(); try { localStorage.setItem('td_sid', sid); } catch (e) {}
+document.getElementById('reset').onclick = () => {
+  cid = null;  // the next message creates a new conversation server-side
   log.innerHTML = '<p class="empty">Zase od začátku. Fajn.</p>';
+  q.focus();
 };
 
 form.onsubmit = async e => {
@@ -85,7 +137,7 @@ form.onsubmit = async e => {
   const him = bubble('him', '…'); let got = '';
   try {
     const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ session_id: sid, message: text }) });
+                                        body: JSON.stringify({ conversation_id: cid, message: text }) });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const reader = r.body.getReader(), dec = new TextDecoder(); let buf = '';
     while (true) {
@@ -96,11 +148,13 @@ form.onsubmit = async e => {
         const line = buf.slice(0, i); buf = buf.slice(i + 2);
         if (!line.startsWith('data: ')) continue;
         const ev = JSON.parse(line.slice(6));
+        if (ev.conversation_id) cid = ev.conversation_id;
         if (ev.t) { got += ev.t; him.textContent = got; log.scrollTop = log.scrollHeight; }
         if (ev.error) { const s = document.createElement('span'); s.className = 'err'; s.textContent = (got ? '\n' : '') + ev.error;
                         if (!got) him.textContent = ''; him.appendChild(s); }
         if (ev.done && ev.sources && ev.sources.length) { const s = document.createElement('span'); s.className = 'src';
                         s.textContent = 'vzpomínky z: ' + ev.sources.join(', '); him.appendChild(s); }
+        if (ev.done) addRating(him, ev.message_id, null);
       }
     }
   } catch (err) {
