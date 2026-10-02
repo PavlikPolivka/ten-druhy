@@ -55,6 +55,12 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
         added a "no repeating hooks" rule
   - [ ] Verify camera/picker on a phone
 - [ ] 9. Better voice (Gemini TTS)
+  - [x] Probe: free tier works (`gemini-3.8-flash-tts` returns WAV, ~5 s; `gemini-2.5-flash-preview-tts` returns PCM);
+        limit 3 requests/min per model; a Czech style instruction gets read aloud, an English one doesn't
+  - [ ] Voice samples in ~/Downloads/ten-druhy-voices → user picks the voice
+  - [ ] `/api/tts` (text → WAV): style prefix, TTS model chain, PCM wrapped to WAV, small LRU cache
+  - [ ] Frontend: play Gemini audio, fall back to browser voice on error/quota; iOS audio unlock in the tap
+  - [ ] `TTS_VOICE` / `TTS_MODELS` in config
 - [ ] 10. Proactive check-ins
 - [ ] 11. Home Assistant
 - [ ] 12. Real-time voice (Gemini Live)

@@ -7,11 +7,11 @@ import threading
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import llm, memory, retrieval, router, sessions
+from app import llm, memory, retrieval, router, sessions, tts
 from app.prompt import system_prompt
 
 STATIC = Path(__file__).parent / "static"
@@ -113,6 +113,18 @@ def list_memories(request: Request):
 @app.delete("/api/memories/{memory_id}")
 def delete_memory(memory_id: int, request: Request):
     return {"ok": memory.delete(_user(request), memory_id)}
+
+
+class TtsIn(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+@app.post("/api/tts")
+def speak(body: TtsIn):
+    try:
+        return Response(tts.synthesize(body.text), media_type="audio/wav")
+    except Exception:
+        raise HTTPException(503, "tts unavailable")  # the browser falls back to its own voice
 
 
 class SettingsIn(BaseModel):

@@ -307,23 +307,50 @@ function pickVoice() {
   // Prefer a male-ish / higher quality Czech voice when the platform has several.
   voice = cs.find(v => /premium|enhanced|natural/i.test(v.name)) || cs.find(v => /google/i.test(v.name)) || cs[0] || null;
 }
-if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; } else { ttsBtn.style.display = 'none'; }
+if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
 
 function renderTts() { ttsBtn.textContent = ttsOn ? '🔊' : '🔈'; ttsBtn.classList.toggle('on', ttsOn); }
 renderTts();
 ttsBtn.onclick = () => {
   ttsOn = !ttsOn; renderTts();
   try { localStorage.setItem('td_tts', ttsOn ? '1' : '0'); } catch (e) {}
-  if (!ttsOn && synth) synth.cancel();
+  if (!ttsOn) stopSpeaking();
 };
 
-function speak(text) {
-  if (!synth || !text) return;
-  synth.cancel();
+// One reusable <audio>: iOS only lets it play later if it was started inside a tap (see unlockAudio).
+const player = new Audio();
+const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+let speakSeq = 0;
+
+function unlockAudio() { player.src = SILENCE; player.play().catch(() => {}); }
+
+function stopSpeaking() {
+  speakSeq++; player.pause();
+  if (synth) synth.cancel();
+}
+
+function browserSpeak(text) {
+  if (!synth) return;
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'cs-CZ'; if (voice) u.voice = voice;
   u.rate = 1.05; u.pitch = 0.8;  // a bit lower and drier
   synth.speak(u);
+}
+
+// His real voice (Gemini TTS, ~5 s to generate); browser voice if the server can't (quota, offline).
+async function speak(text) {
+  if (!text) return;
+  stopSpeaking(); const seq = speakSeq;
+  try {
+    const r = await fetch('api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+    if (!r.ok) throw new Error('tts ' + r.status);
+    const url = URL.createObjectURL(await r.blob());
+    if (seq !== speakSeq) { URL.revokeObjectURL(url); return; }  // user moved on meanwhile
+    player.src = url; player.onended = () => URL.revokeObjectURL(url);
+    await player.play();
+  } catch (e) {
+    if (seq === speakSeq) browserSpeak(text);
+  }
 }
 
 if (Recognition) {
@@ -331,7 +358,7 @@ if (Recognition) {
   let rec = null, finalText = '';
   mic.onclick = () => {
     if (rec) { rec.stop(); return; }  // second tap: stop and send
-    if (synth) synth.cancel();
+    stopSpeaking();
     rec = new Recognition();
     rec.lang = 'cs-CZ'; rec.interimResults = true; rec.continuous = false;
     finalText = ''; mic.classList.add('on'); q.placeholder = 'Poslouchám…';
@@ -357,7 +384,8 @@ form.onsubmit = async e => {
   const img = photo; photo = null; preview.classList.remove('on'); pick.value = '';
   // Spoken question -> spoken answer, even with the speaker toggle off.
   const speakReply = ttsOn || dictated; dictated = false;
-  if (synth) { synth.cancel(); if (speakReply) synth.speak(new SpeechSynthesisUtterance(''));  /* unlocks iOS audio within the gesture */ }
+  stopSpeaking();
+  if (speakReply) { unlockAudio(); if (synth) synth.speak(new SpeechSynthesisUtterance('')); }  // iOS: unlock audio within the tap
   q.value = ''; q.style.height = 'auto'; send.disabled = true;
   bubble('me', text, img);
   const him = bubble('him', '…'); let got = '';
