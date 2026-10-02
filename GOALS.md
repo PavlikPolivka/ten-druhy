@@ -131,6 +131,10 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Public API: Authelia `bypass` for `^/v1/.*$` on druhy.ppolivka.com; /v1 checks its own keys (verified:
         no key 401, key works for models/chat/stream/speech; page and /api still 302 to Authelia)
   - [x] Key management: settings panel per user + `python -m app.apikeys list|create|revoke` on the server
+- [x] 18b. Settings screen (user request: "shit ton of settings")
+  - [x] ⚙ Nastavení as its own wide screen: tone, notifications, calendar, family, API (domain URL + copy, key list)
+  - [x] 🧠 panel only reminders + memory; header as icons (🔈 🧠 🕘 ⚙ ✚)
+  - [x] Public API tested with the user's own key via curl (models, chat with his memory, stream, speech)
 - [ ] 19. Journal & weekly review
 - [ ] 20. Jellyfin
 - [ ] 21. Morning brief (events + weather Buštěhrad; 7:00 weekdays, 9:00 weekends)
