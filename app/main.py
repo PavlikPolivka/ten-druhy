@@ -127,7 +127,8 @@ def delete_conversation(cid: str, request: Request):
 @app.get("/api/memories")
 def list_memories(request: Request):
     user = _user(request)
-    return {"share_family": memory.shares_family(user), "items": memory.visible(user)}
+    t, locked = memory.tone(user)
+    return {"share_family": memory.shares_family(user), "tone": t, "tone_locked": locked, "items": memory.visible(user)}
 
 
 @app.get("/api/memories/new")
@@ -193,12 +194,17 @@ def speak(body: TtsIn):
 
 
 class SettingsIn(BaseModel):
-    share_family: bool
+    share_family: bool | None = None
+    tone: str | None = None
 
 
 @app.post("/api/settings")
 def settings(body: SettingsIn, request: Request):
-    memory.set_share_family(_user(request), body.share_family)
+    user = _user(request)
+    if body.share_family is not None:
+        memory.set_share_family(user, body.share_family)
+    if body.tone is not None and not memory.set_tone(user, body.tone):
+        raise HTTPException(400, "tone not allowed")
     return {"ok": True}
 
 
@@ -256,7 +262,7 @@ def chat(body: ChatIn, request: Request):
             r = router.route(last_user, body.message) if body.message.strip() else router.Route()
             chunks = _search(r.book_query) if r.books else []
             outside, links = _outside(r)
-            system = system_prompt(chunks, name, memory.prompt_block(user), outside)
+            system = system_prompt(chunks, name, memory.prompt_block(user), outside, memory.tone(user)[0])
             text_in = body.message.strip() or "(posílá ti fotku, bez komentáře)"
             convo = prev + [{"role": "user", "content": text_in, "image": (img, "image/jpeg") if img else None}]
             reply = []

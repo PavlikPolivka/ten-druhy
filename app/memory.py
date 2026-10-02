@@ -7,7 +7,7 @@ Scope "family" facts (household, shared people/events) are visible only to users
 import json
 import threading
 
-from app import llm, sessions
+from app import config, llm, sessions
 from app.prompt import now_line
 
 EVERY_N_USER_MESSAGES = 2
@@ -53,6 +53,31 @@ def _db():
 def _q(sql: str, args: tuple = ()) -> list[tuple]:
     _db()
     return sessions._q(sql, args)
+
+
+TONES = ("full", "mild", "kid")
+
+
+def _ensure_tone_column():
+    if "tone" not in [r[1] for r in sessions.db().execute("PRAGMA table_info(users)")]:
+        sessions.db().execute("ALTER TABLE users ADD COLUMN tone TEXT NOT NULL DEFAULT 'full'")
+
+
+def tone(user: str) -> tuple[str, bool]:
+    """(tone, locked). A lock from TONE_LOCK in .env wins over the user's own choice."""
+    if user in config.TONE_LOCK:
+        return config.TONE_LOCK[user], True
+    _db(); _ensure_tone_column()
+    rows = _q("SELECT tone FROM users WHERE user = ?", (user,))
+    return (rows[0][0] if rows and rows[0][0] in TONES else "full"), False
+
+
+def set_tone(user: str, value: str) -> bool:
+    if value not in TONES or user in config.TONE_LOCK:
+        return False
+    _db(); _ensure_tone_column()
+    _q("INSERT INTO users(user, tone) VALUES (?, ?) ON CONFLICT(user) DO UPDATE SET tone = excluded.tone", (user, value))
+    return True
 
 
 def shares_family(user: str) -> bool:

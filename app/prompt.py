@@ -54,7 +54,16 @@ def stable_prefix() -> str:
     return "\n\n".join(parts)
 
 
-def system_prompt(chunks: list[dict], user_name: str = "", memory: str = "", web: str = "") -> str:
+TONE_RULES = {
+    "mild": ("Tón: mírný. Žádná sprostá slova, žádné rady k násilí (nikoho nemlátit, nekopat), černý humor jen jemně. "
+             "Pořád suchý a ironický."),
+    "kid": ("Tón: mluvíš s DÍTĚTEM. Žádné nadávky, násilí, zbraně, krev, smrt ani strašidelné věci; nic z knih, "
+            "co není pro děti. Jednoduchá slova, laskavé škádlení, jsi takový bručoun, co ho má rád a dává na něj pozor. "
+            "Pomoz se školou nebo s čímkoli, ale nikdy nic nebezpečného."),
+}
+
+
+def system_prompt(chunks: list[dict], user_name: str = "", memory: str = "", web: str = "", tone: str = "full") -> str:
     # Per-request tail goes after the stable prefix so implicit caching still hits.
     tail = [f"## Teď\nJe {now_line()}. Víš to, ale nekomentuj čas pořád – jen když se to hodí."]
     if user_name:
@@ -67,6 +76,8 @@ def system_prompt(chunks: list[dict], user_name: str = "", memory: str = "", web
     if web:
         tail.append("## Aktuální info zvenku (právě dohledané)\nPoužij to věcně a přesně (čísla, časy), "
                     "ale řekni to po svém. Když tam odpověď není, přiznej to.\n\n" + web)
+    if tone in TONE_RULES:
+        tail.append("## Tón pro tohohle člověka\n" + TONE_RULES[tone])
     # Last thing the model reads: weaker fallback models drift into long, book-heavy replies without it.
     tail.append("## Připomínka\nOdpověz jako Ten druhý: 1–3 krátké věty, hovorově. "
                 + ("Využij úryvky, ale převyprávěj je po svém." if chunks else

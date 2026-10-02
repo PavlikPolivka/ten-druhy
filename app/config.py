@@ -32,6 +32,9 @@ PIPER_LENGTH_SCALE = float(os.getenv("PIPER_LENGTH_SCALE", "0.9"))  # <1 = faste
 CHECKINS = os.getenv("CHECKINS", "1") == "1"
 PUSH_CONTACT = os.getenv("PUSH_CONTACT", "https://druhy.ppolivka.com")
 
+# Per-person tone pinned server-side, e.g. TONE_LOCK=elenka:kid,babicka:mild (Authelia usernames).
+TONE_LOCK = dict(p.split(":", 1) for p in os.getenv("TONE_LOCK", "").split(",") if ":" in p)
+
 # Home for weather questions without a place, and the morning brief.
 HOME_PLACE = os.getenv("HOME_PLACE", "Buštěhrad")
 

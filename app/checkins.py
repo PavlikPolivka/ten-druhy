@@ -89,7 +89,9 @@ def evaluate(user: str, force: bool = False) -> dict:
     titles = "\n".join(f"- {c['title'] or c['preview']} ({c['updated']} UTC)" for c in sessions.conversations(user, 5)) or "(nic)"
     user_msg = (f"Teď je: {now_line()}\n\nCo o něm víš:\n{facts}\n\nPoslední konverzace:\n{titles}\n\n"
                 f"Poslední tvoje ozvání:\n{recent_txt}")
-    out = json.loads(llm.generate(DECIDE_SYSTEM, user_msg, json_mode=True, temperature=0.7, patient=False))
+    from app.prompt import TONE_RULES
+    system = DECIDE_SYSTEM + ("\n\n" + TONE_RULES[memory.tone(user)[0]] if memory.tone(user)[0] in TONE_RULES else "")
+    out = json.loads(llm.generate(system, user_msg, json_mode=True, temperature=0.7, patient=False))
     send, msg, reason = bool(out.get("send")), (out.get("message") or "").strip(), (out.get("reason") or "")[:200]
     cid = None
     if send and msg:

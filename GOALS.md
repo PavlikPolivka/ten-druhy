@@ -96,7 +96,13 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Web: DuckDuckGo (`ddgs`, region cz-cz) top 5 snippets into the prompt; top 3 links shown under the reply
   - [x] Tested: tomorrow's weather, "vezmu si bundu?", Kaufland opening hours, small talk without search
   - Note: free search snippets are thin for things like sports results
-- [ ] 15. Per-person tone (full / mild / kid)
+- [x] 15. Per-person tone (full / mild / kid)
+  - [x] `tone` per user (users table), chosen in the paměť panel (naplno / mírně / pro děti)
+  - [x] `TONE_LOCK=user:tone,…` in .env pins a tone server-side (kids can't switch themselves to full)
+  - [x] Tone rule in the per-request prompt tail (kid: no swearing/violence/weapons/scary stuff, simple words, kind teasing)
+  - [x] Mild initially still advised "vlep mu jednu" → explicit "no violent advice"
+  - [x] Check-ins use the same tone
+  - [ ] Set `TONE_LOCK` for the kids' Authelia usernames on the server
 - [ ] 16. Reminders
 - [ ] 17. Calendar (Google iCal URL)
 - [ ] 18. OpenAI-compatible API + voice (replaces 10b)
