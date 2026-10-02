@@ -171,7 +171,12 @@ def push_unsubscribe(body: PushUnsubIn, request: Request):
 
 @app.post("/api/push/test")
 def push_test(request: Request):
-    return {"sent": push.send(_user(request), "Ten druhý", "Tak co, funguje to? Jestli jo, budu se ozývat. Bohužel.")}
+    """Like a real check-in: the message lands in a new conversation and the notification opens it."""
+    user, text = _user(request), "Tak co, funguje to? Jestli jo, budu se ozývat. Bohužel."
+    cid = sessions.create(user)
+    sessions.add(cid, "assistant", text)
+    sessions.set_title(cid, "Ozval se sám")
+    return {"sent": push.send(user, "Ten druhý", text, f"/?c={cid}"), "conversation_id": cid}
 
 
 class TtsIn(BaseModel):
