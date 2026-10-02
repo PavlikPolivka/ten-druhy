@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS memory_progress (conversation TEXT PRIMARY KEY, upto 
 EXTRACT_SYSTEM = """Jsi paměť postavy „Ten druhý“ – vnitřního hlasu uživatele. Z nového úseku konverzace vytáhni \
 TRVALÉ informace o UŽIVATELI, které stojí za zapamatování na týdny dopředu: lidé v jeho životě (jména, vztahy), \
 práce, koníčky, zdraví, zvyky, preference, důležité plány a události (s datem), jeho obavy a radosti.
-Fakta ber VÝHRADNĚ z toho, co napsal Uživatel. Repliky Toho druhého jsou jen kontext – jeho návrhy, vtipy a domněnky (např. „vezmi k tomu helmu“) NIKDY neukládej jako fakt.
+Dostaneš jen zprávy uživatele (bez odpovědí Toho druhého). Krátké odpovědi bez kontextu („jo“, „ne“) ignoruj.
 Plány, termíny a události s datem ukládej VŽDY, i pracovní a i když jsou zmíněné jen mimochodem v jiné větě („potřebuju schválení pro zítřejší deploy“ → ulož i ten deploy s datem). Ty jsou nejcennější.
 NEUKLÁDEJ: obsah knih, běžné tlachání, jednorázové drobnosti („jdu si pro kafe“), testovací zprávy.
 Relativní data převeď na absolutní podle aktuálního data (např. „zítra deploy“ → „deploy na produkci v sobotu 3. 10. 2026“).
