@@ -24,11 +24,27 @@ All LLM steps are resumable (cache in `data/derived/cache/`) — rerun after hit
 Run locally: `.venv/bin/uvicorn app.main:app --reload` → http://localhost:8000
 
 ## Deploy (homelab, /opt/tendruhy)
-The server needs only the code, `.env` and `data/derived/{vectors.jsonl,dialogue.jsonl,lore_bible.md}` — not the books.
+Code and data travel separately:
+
+- **Code** → GitHub Actions builds `ghcr.io/pavlikpolivka/ten-druhy` on every push to `main`
+  (`latest` + `sha-xxxxxxx`). The image contains no book data and no secrets.
+- **Data** → `data/derived/` is copyrighted-derived (`vectors.jsonl` contains full chunk text) and is
+  **never committed or baked into the image**. It is copied to the server and bind-mounted read-only.
+
+The server needs only `docker-compose.yml`, `.env` and `data/`:
 ```sh
-mkdir -p data/state && chown 1000 data/state
-docker compose up -d --build
-docker compose run --rm tendruhy python -m ingest.embed --load   # vectors.jsonl -> Qdrant
+# code update
+docker compose pull && docker compose up -d
+# roll back
+TAG=sha-abc1234 docker compose up -d
+# data update (from the Mac)
+scripts/push-data.sh
 ```
-Caddy: a `:9096 { import authelia; reverse_proxy tendruhy:8000 }` site; Authelia rule for the hostname
-(group `family`); Cloudflare tunnel public hostname -> `http://caddy:9096`.
+First-time setup: `mkdir -p data/derived data/state && chown -R 1000 data`, copy `.env`, `docker compose up -d`,
+then `scripts/push-data.sh`.
+
+Routing: Caddy `:9096 { import authelia; reverse_proxy tendruhy:8000 }`, Authelia rule for
+`druhy.ppolivka.com` (group `family`), Cloudflare tunnel public hostname → `http://caddy:9096`.
+
+Backups: `/opt/tendruhy/data` and `/opt/tendruhy/.env` are in the nightly restic job. Qdrant is not backed up —
+it is rebuilt from `vectors.jsonl` with `python -m ingest.embed --load`.

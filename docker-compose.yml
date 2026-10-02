@@ -1,6 +1,7 @@
 services:
   tendruhy:
-    build: .
+    # Built by .github/workflows/docker.yml; pin a sha-xxxxxxx tag via TAG to roll back.
+    image: ghcr.io/pavlikpolivka/ten-druhy:${TAG:-latest}
     container_name: tendruhy
     env_file: .env
     environment:
