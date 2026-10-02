@@ -26,7 +26,6 @@ per-model daily quotas), 2-core homelab box, identity comes from Authelia (`Remo
 | 17 | **Calendar** – Google Calendar via each user's secret iCal URL; feeds replies, check-ins, brief | 1–2 h | ✅ done |
 | 18 | **OpenAI-compatible API** – `/v1/chat/completions` + `/v1/audio/speech` (Piper), token auth, for HA Assist / n8n / scripts on the `portal` network (replaces 10b) | 1–2 h | ✅ done |
 | 19 | **Journal & weekly review** – evening question, Sunday recap from memory | 1–2 h | ✅ done |
-| 20 | **Jellyfin** – "co mám dneska koukat?" from the library | 1–2 h | |
 | 21 | **Morning brief** – today's events (calendar + memory) + weather for Buštěhrad; 7:00 weekdays, 9:00 weekends | 2 h | |
 | 24 | **Homelab watchdog** – alerts in his voice: backups, disk/RAM/load, containers down/looping, certs/tunnel/OS updates | 2–3 h | |
 | 25 | **Home Assistant** – control + sensors + announce on speakers (was #11) | 2–3 h | |
@@ -45,4 +44,4 @@ per-model daily quotas), 2-core homelab box, identity comes from Authelia (`Remo
   calendar = Google (iCal URL); brief = events + weather (Buštěhrad), 7:00 weekdays / 9:00 weekends;
   watchdog = backups, disk/resources, containers, certs & updates.
 - Tools are the shared foundation (router-picked, since native function calling is 429 on the free tier) for 16, 17, 20, 24, 25, 28.
-- Dropped after the interview: n8n actions (22), Paperless search (23).
+- Dropped after the interview: n8n actions (22), Paperless search (23), Jellyfin (20).
