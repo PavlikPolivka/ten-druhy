@@ -15,6 +15,16 @@ Vztah k hostiteli (vypravěči) – jména, kdo to je; Povaha a způsob řeči (
 Klíčové momenty napříč knihami (chronologicky); Co ví a co neví. Rozsah zhruba 900–1 300 slov. Nevymýšlej."""
 
 
+def brief(doc: str) -> str:
+    """Heading + first paragraph of the plot summary. Non-core books stay out of the always-on prompt
+    (full detail is still reachable via RAG); this keeps the per-message prefix within free-tier TPM."""
+    lines = doc.strip().splitlines()
+    heading = lines[0] if lines and lines[0].startswith("## ") else ""
+    body = doc.split("### Shrnutí děje", 1)[-1].strip()
+    para = body.split("\n\n", 1)[0].strip()
+    return f"{heading}\n{para}".strip()
+
+
 def main():
     sections = load_sections()
     summ_system = prompt("summarize_section")
@@ -46,7 +56,7 @@ def main():
         "# Knihy, ve kterých Ten druhý vystupuje",
         *(book_docs[b.slug] for b in order if b.core),
         "# Ostatní Kulhánkovy knihy (stejný autor, jiné příběhy – Ten druhý je zná jen z doslechu)",
-        *(book_docs[b.slug] for b in order if not b.core),
+        *(brief(book_docs[b.slug]) for b in order if not b.core),
     ]
     text = "\n\n".join(p.strip() for p in parts) + "\n"
     path = config.DERIVED_DIR / "lore_bible.md"
