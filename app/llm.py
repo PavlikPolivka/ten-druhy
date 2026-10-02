@@ -16,6 +16,20 @@ from app import config
 _client: genai.Client | None = None
 
 NO_AFC = types.AutomaticFunctionCallingConfig(disable=True)
+# Chat replies are 1-3 sentences; thinking adds ~3-10s latency on 3.x Flash for no gain.
+# Not every model accepts every level, so step down through these (None = model default).
+FAST_LEVELS = ["minimal", "low", None]
+
+
+def _fast(call):
+    """Run call(thinking_config) with the lowest thinking level the model accepts."""
+    for level in FAST_LEVELS:
+        try:
+            return call(types.ThinkingConfig(thinking_level=level) if level else None)
+        except errors.APIError as e:
+            if e.code == 400 and "hinking" in str(e) and level is not None:
+                continue
+            raise
 
 # The books are violent; without this, ordinary lore answers get blocked.
 SAFETY = [
@@ -39,6 +53,7 @@ def client() -> genai.Client:
 
 
 RETRYABLE = (429, 500, 503)
+SKIP = (404,)  # model retired / not available to this key -> just try the next one
 
 
 def _retry(fn, attempts: int = 8):
@@ -66,6 +81,10 @@ def _with_fallback(models: list[str], call, attempts: int, rounds: int = 1):
                 try:
                     return call(m)
                 except errors.APIError as e:
+                    if e.code in SKIP:
+                        last = e
+                        print(f"  [llm] {m}: {e.code}, skipping", flush=True)
+                        break
                     if e.code not in RETRYABLE:
                         raise
                     last = e
@@ -86,31 +105,39 @@ def _contents(history: list[dict]) -> list[types.Content]:
 
 def generate(system: str, user: str, model: str | None = None, json_mode: bool = False, temperature: float = 0.3,
              patient: bool = True) -> str:
-    cfg = types.GenerateContentConfig(
-        system_instruction=system,
-        temperature=temperature,
-        safety_settings=SAFETY,
-        response_mime_type="application/json" if json_mode else None,
-        automatic_function_calling=NO_AFC,
-    )
+    def cfg(thinking=None):
+        return types.GenerateContentConfig(
+            system_instruction=system,
+            temperature=temperature,
+            safety_settings=SAFETY,
+            response_mime_type="application/json" if json_mode else None,
+            automatic_function_calling=NO_AFC,
+            thinking_config=thinking,
+        )
+
+    def call(m):
+        if patient:  # batch extraction: let the model think
+            return client().models.generate_content(model=m, contents=user, config=cfg())
+        return _fast(lambda t: client().models.generate_content(model=m, contents=user, config=cfg(t)))
+
     # Batch scripts are patient (several rounds across the chain); interactive callers fail fast.
-    resp = _with_fallback(
-        _chain(model or config.EXTRACT_MODEL),
-        lambda m: client().models.generate_content(model=m, contents=user, config=cfg),
-        attempts=3 if patient else 1, rounds=5 if patient else 1,
-    )
+    resp = _with_fallback(_chain(model or config.EXTRACT_MODEL), call,
+                          attempts=3 if patient else 1, rounds=5 if patient else 1)
     return resp.text or ""
 
 
 def stream_chat(system: str, history: list[dict], model: str | None = None) -> Iterator[str]:
-    cfg = types.GenerateContentConfig(system_instruction=system, temperature=0.9, safety_settings=SAFETY,
-                                      automatic_function_calling=NO_AFC)
     contents = _contents(history)
 
-    def start(m):
+    def open_stream(m, thinking):
+        cfg = types.GenerateContentConfig(system_instruction=system, temperature=0.9, safety_settings=SAFETY,
+                                          automatic_function_calling=NO_AFC, thinking_config=thinking)
         # Errors can surface on the first read, so pull the first chunk inside the fallback.
         stream = iter(client().models.generate_content_stream(model=m, contents=contents, config=cfg))
         return next(stream, None), stream
+
+    def start(m):
+        return _fast(lambda t: open_stream(m, t))
 
     # Chat is interactive: on 429/503 move to the next model immediately instead of sleeping.
     first, stream = _with_fallback(_chain(model or config.LLM_MODEL), start, attempts=1)
