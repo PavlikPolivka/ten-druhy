@@ -119,7 +119,8 @@ def extract(user: str, conversation: str, force: bool = False):
         return
     own = [f for f in visible(user) if f["own"]]
     existing = "\n".join(f"[{f['id']}] ({f['scope']}) {f['text']}" for f in own) or "(prázdná)"
-    convo = "\n".join(f"{'Uživatel' if m['role'] == 'user' else 'Ten druhý'}: {m['content']}" for m in new)
+    # Only the user's own words: his sarcastic questions ("Že ti to schválíme za nich?") got read as facts.
+    convo = "\n".join(f"Uživatel: {m['content']}" for m in new if m["role"] == "user" and m["content"])
     user_msg = f"Aktuální datum: {now_line()}\n\nEXISTUJÍCÍ paměť:\n{existing}\n\nNOVÝ úsek konverzace:\n{convo}"
     ops = json.loads(llm.generate(EXTRACT_SYSTEM, user_msg, json_mode=True, temperature=0, patient=False))
     _apply(user, conversation, ops, {f["id"] for f in own})
