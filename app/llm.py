@@ -112,7 +112,8 @@ def stream_chat(system: str, history: list[dict], model: str | None = None) -> I
         stream = iter(client().models.generate_content_stream(model=m, contents=contents, config=cfg))
         return next(stream, None), stream
 
-    first, stream = _with_fallback(_chain(model or config.LLM_MODEL), start, attempts=2)
+    # Chat is interactive: on 429/503 move to the next model immediately instead of sleeping.
+    first, stream = _with_fallback(_chain(model or config.LLM_MODEL), start, attempts=1)
     if first is not None and first.text:
         yield first.text
     for chunk in stream:
