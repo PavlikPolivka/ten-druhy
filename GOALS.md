@@ -147,7 +147,7 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Content: today's calendar + dated memories for today + Open-Meteo weather (home place), in his voice, 2–4 sentences
   - [x] 7:00 Mon–Fri, 9:00 Sat–Sun (until noon); once per day; conversation "Ráno – <den>" + push
   - [x] Tested forced run
-- [ ] 24. Homelab watchdog (backups, disk/resources, containers, certs & updates)
+- [x] 24. Homelab watchdog (backups, disk/resources, containers, certs & updates)
   - [x] Read-only collector on the host (`host/tendruhy-hoststatus.py`, systemd timer 5 min, root) → host.json:
         restic log, disks, RAM/load, all containers (state/health/restarts), apt updates, public reachability, cert expiry
   - [x] App only reads host.json (no Docker socket, no host access); admins = `ADMIN_USERS` (default pavel)
@@ -158,7 +158,9 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Tool `homelab_status` (admins only): "jak je na tom server?"
   - [x] Tested on real host data + simulated disk/container/restic problems (found and fixed: crashed container
         auto-"resolved" next tick; invented numbers in the resolved message; stale health on stopped containers)
-  - [ ] User installs the collector: `sudo bash /tmp/tendruhy-host/install.sh`
+  - [x] Collector installed on the host; data flowing every 5 min
+  - [x] Real-use finding: a weak fallback model invented "telegraf → influxdb" in an alert → alerts are now his
+        one-line opener (no facts allowed) + the exact fact lines from the watchdog
 - [ ] 25. Home Assistant control
 - [ ] 26. Kulhánek adventure
 - [ ] 27. Family chat

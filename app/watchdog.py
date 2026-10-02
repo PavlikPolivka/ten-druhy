@@ -101,13 +101,13 @@ def problems(h: dict, prev_containers: dict, open_keys: set[str] = frozenset()) 
     return p
 
 
-VOICE = ("Jsi „Ten druhý“, cynický vnitřní hlas, a hlídáš mu homelab. Napiš mu krátkou zprávu (1–3 věty) o tom, "
-         "co se děje na serveru. Fakta (názvy kontejnerů, čísla, časy) přesně; NESPEKULUJ o příčinách, nic nevymýšlej, "
-         "žádné příkazy. VYŘEŠENO znamená, že už je to v pořádku – tak to i řekni. Česky, hovorově, suše.")
+QUIP = ("Jsi „Ten druhý“, cynický vnitřní hlas, a hlídáš mu homelab. Napiš JEDNU krátkou úvodní větu k hlášení ze "
+        "serveru (česky, hovorově, suše). NEZMIŇUJ žádná konkrétní fakta, názvy, služby ani čísla – ty přijdou pod tebou "
+        "doslova. Jen nálada: {mood}. Vrať jen tu větu.")
 
 
 def _resolved_text(key: str, h: dict | None) -> str:
-    """What's true NOW for a cleared problem (current values, so the model has nothing to guess)."""
+    """What's true NOW for a cleared problem (current values, nothing to guess)."""
     h = h or {}
     if key.startswith("disk:"):
         d = next((d for d in h.get("disks", []) if d["mount"] == key[5:]), None)
@@ -123,12 +123,16 @@ def _resolved_text(key: str, h: dict | None) -> str:
 
 
 def _message(new: list[str], repeat: list[str], resolved: list[str]) -> str:
-    facts = "\n".join([*(f"NOVĚ: {x}" for x in new), *(f"POŘÁD: {x}" for x in repeat), *(f"VYŘEŠENO: {x}" for x in resolved)])
+    """His one-line opener (no facts, so nothing to hallucinate) + the exact facts as the watchdog found them."""
+    mood = ("špatné zprávy" if new else "pořád to samé, nikdo to nespravil" if repeat else "dobré zprávy, je to spravené")
     try:
-        text = llm.generate(VOICE, facts, temperature=0.7, patient=False).strip()
+        quip = llm.generate(QUIP.format(mood=mood), "Úvodní věta:", temperature=0.9, patient=False).strip().splitlines()[0]
     except Exception:
-        text = ""
-    return text or "Homelab:\n" + facts
+        quip = ""
+    quip = quip or {"špatné zprávy": "Server hlásí problém.", "dobré zprávy, je to spravené": "Dobrý zprávy, pro změnu."}.get(
+        mood, "Pořád to visí.")
+    lines = [*(f"• {x}" for x in new), *(f"• pořád: {x}" for x in repeat), *(f"• ✓ {x}" for x in resolved)]
+    return quip + "\n" + "\n".join(lines)
 
 
 def check():
