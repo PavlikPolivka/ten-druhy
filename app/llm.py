@@ -15,6 +15,8 @@ from app import config
 
 _client: genai.Client | None = None
 
+NO_AFC = types.AutomaticFunctionCallingConfig(disable=True)
+
 # The books are violent; without this, ordinary lore answers get blocked.
 SAFETY = [
     types.SafetySetting(category=c, threshold=types.HarmBlockThreshold.BLOCK_NONE)
@@ -61,13 +63,15 @@ def generate(system: str, user: str, model: str | None = None, json_mode: bool =
         temperature=temperature,
         safety_settings=SAFETY,
         response_mime_type="application/json" if json_mode else None,
+        automatic_function_calling=NO_AFC,
     )
     resp = _retry(lambda: client().models.generate_content(model=model or config.EXTRACT_MODEL, contents=user, config=cfg))
     return resp.text or ""
 
 
 def stream_chat(system: str, history: list[dict], model: str | None = None) -> Iterator[str]:
-    cfg = types.GenerateContentConfig(system_instruction=system, temperature=0.9, safety_settings=SAFETY)
+    cfg = types.GenerateContentConfig(system_instruction=system, temperature=0.9, safety_settings=SAFETY,
+                                      automatic_function_calling=NO_AFC)
     stream = _retry(lambda: client().models.generate_content_stream(
         model=model or config.LLM_MODEL, contents=_contents(history), config=cfg))
     for chunk in stream:
