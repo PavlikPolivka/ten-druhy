@@ -9,6 +9,7 @@ against QDRANT_URL; no re-embedding (and no API calls) needed.
 
 import json
 import sys
+import time
 import uuid
 
 from qdrant_client import models
@@ -19,7 +20,9 @@ from app.textnorm import sparse_vector
 from ingest.books import TEXT
 
 VECTORS = config.DERIVED_DIR / "vectors.jsonl"
-BATCH = 50
+# Free tier caps embedding tokens per minute; ~10 chunks (~10k tokens) per request, paced.
+BATCH = 10
+PAUSE_S = 12
 
 
 def embed_missing():
@@ -38,6 +41,7 @@ def embed_missing():
                 out.write(json.dumps({**c, "dense": v}, ensure_ascii=False) + "\n")
             out.flush()
             print(f"  {i + len(batch)}/{len(todo)}", flush=True)
+            time.sleep(PAUSE_S)
 
 
 def load():
