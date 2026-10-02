@@ -15,11 +15,35 @@ per-model daily quotas), 2-core homelab box, identity comes from Authelia (`Remo
 | 8 | **Photos** – send a picture, he comments (Gemini multimodal) | 1–2 h | ✅ done |
 | 9 | **Better voice** – Gemini TTS (`gemini-3.8-flash-tts`) with a gravelly cynical voice; check free quota | 2–3 h | ✅ done |
 | 10 | **Proactive check-ins** – web push (needs #3) + memory (#7) + scheduler: "Tak co, přežili jsme ten deploy?" | 3–4 h | ✅ done |
-| 10b | **Automation API** – token-auth `/api/v1/chat` (+ voice as WAV) for n8n / Home Assistant / scripts on the `portal` network; optional public access later | 1–2 h | |
-| 11 | **Home Assistant** – comments on house state / speaks through a speaker | 2–3 h | |
-| 12 | **Real-time voice** – Gemini Live (`gemini-3.1-flash-live-preview`), WebSocket proxy through Caddy | 1 day+ | |
-| 13 | **WhatsApp** – same backend via WhatsApp (Cloud API or a bridge), allowlisted numbers | 2–4 h | |
+
+## Phase 2 – from the brainstorm (ordered cheapest first, by request)
+
+| # | Feature | Effort | Status |
+|---|---|---|---|
+| 14 | **Web search** – Gemini Google Search grounding for current info | 1 h | |
+| 15 | **Per-person tone** – full / mild / kid setting per user (Elenka gets no swearing/violence) | 1 h | |
+| 16 | **Reminders** – "připomeň mi zítra v 8…" → push at that time in his voice | 1–2 h | |
+| 17 | **Calendar** – Google Calendar via each user's secret iCal URL; feeds replies, check-ins, brief | 1–2 h | |
+| 18 | **OpenAI-compatible API** – `/v1/chat/completions` + `/v1/audio/speech` (Piper), token auth, for HA Assist / n8n / scripts on the `portal` network (replaces 10b) | 1–2 h | |
+| 19 | **Journal & weekly review** – evening question, Sunday recap from memory | 1–2 h | |
+| 20 | **Jellyfin** – "co mám dneska koukat?" from the library | 1–2 h | |
+| 21 | **Morning brief** – today's events (calendar + memory) + weather for Buštěhrad; 7:00 weekdays, 9:00 weekends | 2 h | |
+| 22 | **n8n actions** – trigger allowlisted n8n workflows via webhooks | 2 h | |
+| 23 | **Paperless search** – find documents in Paperless-ngx ("kde mám záruku k pračce?") | 2 h | |
+| 24 | **Homelab watchdog** – alerts in his voice: backups, disk/RAM/load, containers down/looping, certs/tunnel/OS updates | 2–3 h | |
+| 25 | **Home Assistant** – control + sensors + announce on speakers (was #11) | 2–3 h | |
+| 26 | **Kulhánek adventure** – interactive text adventure in the books' world, he narrates | 2–3 h | |
+| 27 | **Family chat** – one shared conversation for the family, with him in it | 3 h | |
+| 28 | **Server commands** – broad scope on the host (not Docker): allowlisted named commands via a dedicated SSH user + forced-command wrapper; read-only runs directly, anything state-changing needs a tap on "Proveď" in chat; admins only (Authelia `admins`); audit log | 3–5 h | |
+| 29 | **Real-time voice** – Gemini Live, WebSocket proxy through Caddy (was #12) | 1 day+ | |
+| 30 | **WhatsApp** – same backend via WhatsApp, allowlisted numbers (was #13) | 2–4 h | |
 
 ## Decisions
 - Memory is **per person** by default; a shared family layer is opt-in (#7).
 - Memory facts live as a short list in the prompt, not as embeddings (embedding quota is shared with RAG).
+- Read-aloud uses the local Piper voice only; Gemini TTS (10/day) is opt-in.
+- Phase 2 interview (2026-10-02): all brainstorm ideas in; cheapest first; tone is a per-person setting;
+  server commands = broad scope but every state change confirmed by a button tap, admins only;
+  calendar = Google (iCal URL); brief = events + weather (Buštěhrad), 7:00 weekdays / 9:00 weekends;
+  watchdog = backups, disk/resources, containers, certs & updates.
+- Tools (Gemini function calling) are the shared foundation for 16, 17, 20, 22–25, 28.

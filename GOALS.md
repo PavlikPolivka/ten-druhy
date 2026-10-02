@@ -89,7 +89,20 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] It did run (every 2nd user message) but was invisible → "🧠 zapamatoval jsem si: …" under the reply
   - [x] Extractor too strict (dropped "zítřejší deploy") → dated plans/events are always kept
   - [x] Leftover odd messages → scheduler sweeps conversations idle > 10 min
-- [ ] 10b. Automation API (text + voice) for n8n / Home Assistant / scripts
-- [ ] 11. Home Assistant
-- [ ] 12. Real-time voice (Gemini Live)
-- [ ] 13. WhatsApp
+- [ ] 14. Web search
+- [ ] 15. Per-person tone (full / mild / kid)
+- [ ] 16. Reminders
+- [ ] 17. Calendar (Google iCal URL)
+- [ ] 18. OpenAI-compatible API + voice (replaces 10b)
+- [ ] 19. Journal & weekly review
+- [ ] 20. Jellyfin
+- [ ] 21. Morning brief (events + weather Buštěhrad; 7:00 weekdays, 9:00 weekends)
+- [ ] 22. n8n actions
+- [ ] 23. Paperless search
+- [ ] 24. Homelab watchdog (backups, disk/resources, containers, certs & updates)
+- [ ] 25. Home Assistant control
+- [ ] 26. Kulhánek adventure
+- [ ] 27. Family chat
+- [ ] 28. Server commands (broad, confirm by button, admins only, audit log)
+- [ ] 29. Real-time voice (Gemini Live)
+- [ ] 30. WhatsApp
