@@ -74,6 +74,11 @@
   #mic.on { background: var(--accent); color: #fff; border-color: var(--accent); animation: pulse 1.2s infinite; }
   @keyframes pulse { 50% { opacity: .6; } }
   #tts.on { color: var(--ink); border-color: var(--ink); }
+  .share { display: flex; gap: 10px; align-items: flex-start; padding: 12px 16px; border-bottom: 1px solid var(--line);
+           font-family: system-ui, sans-serif; font-size: .85rem; color: var(--muted); cursor: pointer; }
+  .share input { margin-top: 2px; accent-color: var(--accent); }
+  .fam { color: var(--accent); font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; margin-right: 4px; }
+  @media (max-width: 520px) { header small { display: none; } .hbtn { padding: 4px 7px; } }
   .rate { display: flex; gap: 2px; margin: -8px 0 14px 4px; }
   .rate button { background: none; border: 0; padding: 2px 6px; font-size: .85rem; opacity: .35; filter: grayscale(1);
                  border-radius: 6px; }
@@ -88,6 +93,7 @@
   <div><h1>Ten<span>,</span> druhý</h1><small>hlas, co ti radí, i když nechceš</small></div>
   <div class="actions">
     <button id="tts" class="hbtn" title="Číst odpovědi nahlas">🔈</button>
+    <button id="mem" class="hbtn" title="Co si o tobě pamatuju">paměť</button>
     <button id="hist" class="hbtn" title="Předchozí konverzace">historie</button>
     <button id="reset" class="hbtn" title="Začít novou konverzaci (stará zůstane uložená)">nová</button>
   </div>
@@ -95,7 +101,7 @@
 <div id="drawer" aria-hidden="true">
   <div class="shade"></div>
   <div class="panel">
-    <h2>Na co jsme už mysleli <button id="close" class="hbtn" title="Zavřít">✕</button></h2>
+    <h2><span id="dtitle">Na co jsme už mysleli</span> <button id="close" class="hbtn" title="Zavřít">✕</button></h2>
     <div id="convs"></div>
   </div>
 </div>
@@ -167,7 +173,57 @@ function when(ts) {
     : d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
 }
 
+const dtitle = document.getElementById('dtitle');
+
+function twoStep(btn, label, onConfirm) {
+  btn.className = 'del'; btn.type = 'button'; btn.textContent = label;
+  btn.onclick = async ev => {
+    ev.stopPropagation();
+    if (!btn.classList.contains('arm')) { btn.classList.add('arm'); btn.textContent = 'fakt?'; return; }
+    await onConfirm();
+  };
+}
+
+async function openMemory() {
+  dtitle.textContent = 'Co o tobě vím';
+  drawer.classList.add('open'); convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
+  let st = { share_family: false, items: [] };
+  try { st = await (await fetch('api/memories')).json(); } catch (e) {}
+  convs.innerHTML = '';
+  const share = document.createElement('label'); share.className = 'share';
+  const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = st.share_family;
+  const txt = document.createElement('span');
+  txt.textContent = 'Sdílet rodinné věci (děti, partner, společné akce) s ostatními v rodině, kteří to mají taky zapnuté.';
+  cb.onchange = async () => {
+    await fetch('api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ share_family: cb.checked }) }).catch(() => {});
+    openMemory();
+  };
+  share.append(cb, txt); convs.appendChild(share);
+  if (!st.items.length) {
+    convs.insertAdjacentHTML('beforeend', '<p class="empty" style="margin-top:2em">Zatím nic. Musíš mi něco říct, chytráku.</p>');
+    return;
+  }
+  for (const m of st.items) {
+    const row = document.createElement('div'); row.className = 'conv'; row.style.cursor = 'default';
+    const t = document.createElement('div'); t.className = 't';
+    const b = document.createElement('span');
+    if (m.scope === 'family') { const f = document.createElement('span'); f.className = 'fam'; f.textContent = 'rodina'; t.appendChild(f); }
+    b.textContent = m.text; t.appendChild(b);
+    if (!m.own) { const sm = document.createElement('small'); sm.textContent = ' · od ' + m.user; t.appendChild(sm); }
+    row.appendChild(t);
+    if (m.own) {
+      const del = document.createElement('button');
+      twoStep(del, 'zapomenout', async () => { await fetch('api/memories/' + m.id, { method: 'DELETE' }).catch(() => {}); row.remove(); });
+      row.appendChild(del);
+    }
+    convs.appendChild(row);
+  }
+}
+document.getElementById('mem').onclick = openMemory;
+
 async function openHistory() {
+  dtitle.textContent = 'Na co jsme už mysleli';
   drawer.classList.add('open'); convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
   let list = [];
   try { list = await (await fetch('api/conversations')).json(); } catch (e) {}
@@ -178,14 +234,12 @@ async function openHistory() {
     const b = document.createElement('b'); b.textContent = c.title || c.preview || '(bez názvu)';
     const sm = document.createElement('small'); sm.textContent = when(c.updated);
     t.append(b, sm);
-    const del = document.createElement('button'); del.className = 'del'; del.type = 'button'; del.textContent = 'smazat';
-    del.onclick = async ev => {
-      ev.stopPropagation();
-      if (!del.classList.contains('arm')) { del.classList.add('arm'); del.textContent = 'fakt?'; return; }
+    const del = document.createElement('button');
+    twoStep(del, 'smazat', async () => {
       await fetch('api/conversations/' + c.id, { method: 'DELETE' }).catch(() => {});
       row.remove();
       if (c.id === cid) { cid = null; log.innerHTML = '<p class="empty">Smazáno. Jako by se to nikdy nestalo.</p>'; }
-    };
+    });
     row.onclick = async () => { cid = c.id; closeHistory(); log.innerHTML = ''; await loadState(); };
     row.append(t, del); convs.appendChild(row);
   }

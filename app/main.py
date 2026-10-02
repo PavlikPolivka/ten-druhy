@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import llm, retrieval, router, sessions
+from app import llm, memory, retrieval, router, sessions
 from app.prompt import system_prompt
 
 STATIC = Path(__file__).parent / "static"
@@ -102,6 +102,27 @@ def delete_conversation(cid: str, request: Request):
     return {"ok": sessions.delete(_user(request), cid)}
 
 
+@app.get("/api/memories")
+def list_memories(request: Request):
+    user = _user(request)
+    return {"share_family": memory.shares_family(user), "items": memory.visible(user)}
+
+
+@app.delete("/api/memories/{memory_id}")
+def delete_memory(memory_id: int, request: Request):
+    return {"ok": memory.delete(_user(request), memory_id)}
+
+
+class SettingsIn(BaseModel):
+    share_family: bool
+
+
+@app.post("/api/settings")
+def settings(body: SettingsIn, request: Request):
+    memory.set_share_family(_user(request), body.share_family)
+    return {"ok": True}
+
+
 class FeedbackIn(BaseModel):
     message_id: int
     rating: int = Field(ge=-1, le=1)
@@ -131,7 +152,7 @@ def chat(body: ChatIn, request: Request):
             # Only pull book excerpts when the message is actually about the books.
             about_books, query = router.route(last_user, body.message)
             chunks = _search(query) if about_books else []
-            system = system_prompt(chunks, name)
+            system = system_prompt(chunks, name, memory.prompt_block(user))
             convo = prev + [{"role": "user", "content": body.message}]
             reply = []
             for piece in llm.stream_chat(system, convo):
@@ -142,6 +163,7 @@ def chat(body: ChatIn, request: Request):
             if text:
                 sessions.add(cid, "user", body.message)
                 mid = sessions.add(cid, "assistant", text)
+                memory.extract_async(user, cid)
                 if not prev and not sessions.title(cid):
                     threading.Thread(target=_make_title, args=(cid, body.message, text), daemon=True).start()
             yield _sse({"done": True, "message_id": mid, "sources": sorted({c["book_title"] for c in chunks})})

@@ -54,12 +54,19 @@ def stable_prefix() -> str:
     return "\n\n".join(parts)
 
 
-def system_prompt(chunks: list[dict], user_name: str = "") -> str:
+def system_prompt(chunks: list[dict], user_name: str = "", memory: str = "") -> str:
     # Per-request tail goes after the stable prefix so implicit caching still hits.
     tail = [f"## Teď\nJe {now_line()}. Víš to, ale nekomentuj čas pořád – jen když se to hodí."]
     if user_name:
         tail.append(f"## Čí jsi hlas\nTeď sedíš v hlavě člověka jménem {user_name}. Jménem ho/ji skoro nikdy neoslovuješ.")
+    if memory:
+        tail.append(memory)
     if chunks:
         excerpts = "\n\n".join(f"[{c['book_title']}]\n{c['text']}" for c in chunks)
         tail.append(f"## Úryvky z knih k aktuální otázce\n\n{excerpts}")
+    # Last thing the model reads: weaker fallback models drift into long, book-heavy replies without it.
+    tail.append("## Připomínka\nOdpověz jako Ten druhý: 1–3 krátké věty, hovorově. "
+                + ("Využij úryvky, ale převyprávěj je po svém." if chunks else
+                   "Žádné narážky na knihy, postavy ani zbraně z knih – řeč je o jeho životě.")
+                + " Nepoužívej fráze z ukázek doslova.")
     return "\n\n".join([stable_prefix(), *tail])

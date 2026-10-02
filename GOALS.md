@@ -31,14 +31,19 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Stop speaking when a new message is sent or the mic is pressed
   - [ ] Verify on iOS Safari / installed PWA and Android Chrome
   - Note: Apple's only Czech system voice is female (Zuzana) — proper voice comes with #9
-- [ ] 7. Long-term memory
-  - [ ] `memories` table (user, scope user|family, text) + `users` table (share_family opt-in)
-  - [ ] Extractor: Flash-Lite in a background thread every 2 new user messages; sees existing memories and
+- [x] 7. Long-term memory
+  - [x] `memories` table (user, scope user|family, text) + `users` table (share_family opt-in)
+  - [x] Extractor: Flash-Lite in a background thread every 2 new user messages; sees existing memories and
         returns add/update/delete ops as JSON; relative dates ("zítra") resolved to absolute ones
-  - [ ] Inject "Co o něm víš" (own + family if opted in) into the per-request prompt tail, capped
-  - [ ] Persona rule: use memories naturally, never recite them
-  - [ ] "paměť" panel: list, delete single facts, family-sharing toggle
-  - [ ] Test: facts extracted, updated (not duplicated), deleted; isolation between users
+  - [x] Facts only from what the user wrote (his own suggestions like "vezmi helmu" were leaking in)
+  - [x] Inject "Co o něm víš" (own + family if opted in) into the per-request prompt tail, capped at 80
+  - [x] Persona rule: use memories naturally, never recite them
+  - [x] "paměť" panel: list, forget single facts (two-step), family-sharing toggle
+  - [x] Tested: extraction, update instead of duplicate, recall in a new conversation, user isolation,
+        family facts shared only between opted-in users, can't delete someone else's fact
+  - [x] Found on the way: weaker fallback models (3.5-flash) went long and book-heavy → end-of-prompt
+        reminder + chain reordered by voice quality
+  - [ ] Verify the panel on a phone
 - [ ] 8. Photos
 - [ ] 9. Better voice (Gemini TTS)
 - [ ] 10. Proactive check-ins

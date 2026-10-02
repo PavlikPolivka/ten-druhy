@@ -11,7 +11,8 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-flash-latest")
 EXTRACT_MODEL = os.getenv("EXTRACT_MODEL", "gemini-flash-lite-latest")
 # Each model has its own free-tier quota, so a long chain multiplies free capacity.
-FALLBACK_MODELS = [m for m in os.getenv("FALLBACK_MODELS", "gemini-3.6-flash,gemini-3.5-flash,gemini-3-flash-preview,gemini-3.7-flash,gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.1-flash-lite").split(",") if m]
+# Ordered by how well the model holds the persona voice (Flash-Lite beats 3.5-flash there), not by size.
+FALLBACK_MODELS = [m for m in os.getenv("FALLBACK_MODELS", "gemini-3.6-flash,gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3-flash-preview,gemini-3.7-flash,gemini-3.1-flash-lite").split(",") if m]
 EMBED_MODEL = os.getenv("EMBED_MODEL", "gemini-embedding-001")
 EMBED_DIM = int(os.getenv("EMBED_DIM", "768"))
 
