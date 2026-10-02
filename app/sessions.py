@@ -59,6 +59,35 @@ def latest(user: str) -> str | None:
     return rows[0][0] if rows else None
 
 
+def conversations(user: str, limit: int = 100) -> list[dict]:
+    rows = _q("""SELECT c.id, c.title, c.updated,
+                 (SELECT content FROM messages m WHERE m.conversation = c.id AND m.role = 'user' ORDER BY m.id LIMIT 1)
+                 FROM conversations c WHERE c.user = ?
+                 AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation = c.id)
+                 ORDER BY c.updated DESC LIMIT ?""", (user, limit))
+    return [{"id": i, "title": t, "updated": u, "preview": (p or "")[:80]} for i, t, u, p in rows]
+
+
+def set_title(conversation: str, title: str):
+    _q("UPDATE conversations SET title = ? WHERE id = ?", (title, conversation))
+
+
+def title(conversation: str) -> str | None:
+    rows = _q("SELECT title FROM conversations WHERE id = ?", (conversation,))
+    return rows[0][0] if rows else None
+
+
+def delete(user: str, conversation: str) -> bool:
+    if not owns(user, conversation):
+        return False
+    with _lock:
+        db().execute("DELETE FROM feedback WHERE message_id IN (SELECT id FROM messages WHERE conversation = ?)", (conversation,))
+        db().execute("DELETE FROM messages WHERE conversation = ?", (conversation,))
+        db().execute("DELETE FROM conversations WHERE id = ?", (conversation,))
+        db().commit()
+    return True
+
+
 def add(conversation: str, role: str, content: str) -> int:
     with _lock:
         cur = db().execute("INSERT INTO messages(conversation, role, content) VALUES (?, ?, ?)", (conversation, role, content))

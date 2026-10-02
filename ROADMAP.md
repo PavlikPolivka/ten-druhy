@@ -9,7 +9,7 @@ per-model daily quotas), 2-core homelab box, identity comes from Authelia (`Remo
 | 2 | **Memory across devices** – conversations belong to the Authelia user, not the browser | 30 min | ✅ done |
 | 3 | **PWA** – manifest, icon, service worker, mobile polish (check Authelia redirect inside installed app, iOS) | 45 min | ✅ done |
 | 4 | **👍/👎 feedback** – log good/bad exchanges for persona tuning | 30 min | ✅ done |
-| 5 | **Chat history** – list, resume, delete past conversations; auto titles (Flash-Lite) | 1–2 h | |
+| 5 | **Chat history** – list, resume, delete past conversations; auto titles (Flash-Lite) | 1–2 h | ✅ done |
 | 6 | **Voice, basic** – mic (browser speech recognition) + read replies aloud (speechSynthesis) | 1–2 h | |
 | 7 | **Long-term memory** – Flash-Lite extracts durable facts per conversation into a per-user memory table, injected into the prompt; view/delete page; opt-in shared family layer | 2–4 h | |
 | 8 | **Photos** – send a picture, he comments (Gemini multimodal) | 1–2 h | |

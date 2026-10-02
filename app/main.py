@@ -1,6 +1,7 @@
 """FastAPI app: static chat page + SSE chat endpoint. Auth is handled upstream (Caddy + Authelia)."""
 
 import json
+import threading
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -76,6 +77,31 @@ def state(request: Request, conversation_id: str | None = None):
     return {"name": _first_name(request), "conversation_id": cid, "messages": sessions.messages(cid) if cid else []}
 
 
+TITLE_SYSTEM = ("Vymysli krátký český název (2–5 slov, bez uvozovek a tečky) pro konverzaci podle první výměny. "
+                "Výstižně podle tématu, klidně s lehkou ironií.")
+
+
+def _make_title(cid: str, message: str, reply: str):
+    """Runs in a thread after the reply is streamed, so titling never delays the chat."""
+    try:
+        t = llm.generate(TITLE_SYSTEM, f"Uživatel: {message}\nOdpověď: {reply}", temperature=0.5, patient=False)
+        t = t.strip().strip('"„“.').splitlines()[0][:60] if t.strip() else ""
+        if t:
+            sessions.set_title(cid, t)
+    except Exception as e:
+        print(f"  [title] skipped: {str(e)[:80]}", flush=True)
+
+
+@app.get("/api/conversations")
+def list_conversations(request: Request):
+    return sessions.conversations(_user(request))
+
+
+@app.delete("/api/conversations/{cid}")
+def delete_conversation(cid: str, request: Request):
+    return {"ok": sessions.delete(_user(request), cid)}
+
+
 class FeedbackIn(BaseModel):
     message_id: int
     rating: int = Field(ge=-1, le=1)
@@ -116,6 +142,8 @@ def chat(body: ChatIn, request: Request):
             if text:
                 sessions.add(cid, "user", body.message)
                 mid = sessions.add(cid, "assistant", text)
+                if not prev and not sessions.title(cid):
+                    threading.Thread(target=_make_title, args=(cid, body.message, text), daemon=True).start()
             yield _sse({"done": True, "message_id": mid, "sources": sorted({c["book_title"] for c in chunks})})
         except Exception as e:  # surface errors (e.g. free-tier quota) to the UI instead of a dead stream
             msg = str(e)
