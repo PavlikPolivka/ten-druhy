@@ -2,6 +2,7 @@
 
 import base64
 import binascii
+import hmac
 import json
 import threading
 from pathlib import Path
@@ -11,12 +12,23 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import apikeys, calendar_ics, checkins, llm, memory, push, reminders, retrieval, router, sessions, tools, tts, web
+from app import apikeys, calendar_ics, checkins, config, llm, memory, push, reminders, retrieval, router, sessions, tools, tts, web
 from app.prompt import system_prompt
 
 STATIC = Path(__file__).parent / "static"
 app = FastAPI(title="Ten druhý", on_startup=[checkins.start, reminders.start])
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+
+@app.middleware("http")
+async def require_proxy(request: Request, call_next):
+    """Everything except /v1 (own API keys) and /healthz must come through Caddy, which sets X-TD-Proxy after
+    Authelia. Without this, any container on the `portal` network could send `Remote-User: pavel` itself."""
+    path = request.url.path
+    if config.PROXY_SECRET and not (path.startswith("/v1/") or path == "/healthz"):
+        if not hmac.compare_digest(request.headers.get("x-td-proxy", ""), config.PROXY_SECRET):
+            return Response("forbidden", status_code=403)
+    return await call_next(request)
 
 from app.openai_api import router as openai_router  # noqa: E402  (/v1/*, bearer-key auth)
 

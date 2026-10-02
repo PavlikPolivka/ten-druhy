@@ -49,3 +49,25 @@ def revoke(user: str, key_id: int) -> bool:
         return False
     _q("DELETE FROM api_keys WHERE id = ?", (key_id,))
     return True
+
+
+def all_keys() -> list[dict]:
+    rows = _q("SELECT id, user, name, created, last_used FROM api_keys ORDER BY user, id")
+    return [{"id": i, "user": u, "name": n, "created": c, "last_used": l} for i, u, n, c, l in rows]
+
+
+if __name__ == "__main__":
+    # docker compose exec tendruhy python -m app.apikeys list | create <user> <name> | revoke <id>
+    import sys
+
+    cmd = sys.argv[1:] or ["list"]
+    if cmd[0] == "list":
+        for k in all_keys():
+            print(f"{k['id']:>3}  {k['user']:<12} {k['name']:<24} created {k['created']}  last used {k['last_used'] or '-'}")
+    elif cmd[0] == "create" and len(cmd) >= 3:
+        print(create(cmd[1], " ".join(cmd[2:])), "  <- shown once")
+    elif cmd[0] == "revoke" and len(cmd) == 2:
+        rows = _q("SELECT user FROM api_keys WHERE id = ?", (int(cmd[1]),))
+        print("revoked" if rows and revoke(rows[0][0], int(cmd[1])) else "no such key")
+    else:
+        print("usage: python -m app.apikeys list | create <user> <name> | revoke <id>")

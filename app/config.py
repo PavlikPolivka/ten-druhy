@@ -35,6 +35,9 @@ PUSH_CONTACT = os.getenv("PUSH_CONTACT", "https://druhy.ppolivka.com")
 # Per-person tone pinned server-side, e.g. TONE_LOCK=elenka:kid,babicka:mild (Authelia usernames).
 TONE_LOCK = dict(p.split(":", 1) for p in os.getenv("TONE_LOCK", "").split(",") if ":" in p)
 
+# Shared secret Caddy adds as X-TD-Proxy; when set, only /v1 and /healthz work without it. Empty = off.
+PROXY_SECRET = os.getenv("TD_PROXY_SECRET", "")
+
 # Home for weather questions without a place, and the morning brief.
 HOME_PLACE = os.getenv("HOME_PLACE", "Buštěhrad")
 
