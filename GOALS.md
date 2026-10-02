@@ -102,8 +102,14 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Tone rule in the per-request prompt tail (kid: no swearing/violence/weapons/scary stuff, simple words, kind teasing)
   - [x] Mild initially still advised "vlep mu jednu" → explicit "no violent advice"
   - [x] Check-ins use the same tone
-  - [ ] Set `TONE_LOCK` for the kids' Authelia usernames on the server
+  - [ ] Set `TONE_LOCK` once the kids get Authelia accounts (today only `pavel` and `nikola` exist)
 - [ ] 16. Reminders
+  - [ ] Tools foundation: Gemini function calling in the chat loop (call → run → feed result → continue streaming),
+        tools registered per user with access rules, results logged
+  - [ ] Tools: `create_reminder(when, text)`, `list_reminders()`, `cancel_reminder(id)`; times resolved in Europe/Prague
+  - [ ] Scheduler fires due reminders as push + a message in a new conversation (like check-ins), in his voice
+  - [ ] Reminders visible in the paměť panel with cancel
+  - [ ] Test: "připomeň mi zítra v 8 zavolat mámě", "za 2 minuty", list, cancel, firing
 - [ ] 17. Calendar (Google iCal URL)
 - [ ] 18. OpenAI-compatible API + voice (replaces 10b)
 - [ ] 19. Journal & weekly review
