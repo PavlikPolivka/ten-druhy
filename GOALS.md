@@ -64,12 +64,11 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] No style prompt (it was read aloud by 2.5 and caused an English accent: "rvat" instead of "řvát")
   - [x] Status in the reply bubble: "chystám hlas…" while generating, "mluví · zastavit" while playing
   - [x] 🔊 replay button next to 👍/👎 on every reply
-  - [ ] User picks the voice from ~/Downloads/ten-druhy-voices (Algenib, Charon, Orus, Zubenelgenubi)
   - [ ] Verify playback on iOS / Android
 - [ ] 9b. Local Czech voice (Piper) – Gemini TTS is capped at 10/day per model
-  - [ ] `piper-tts` in the image; `cs_CZ-jirka-medium` downloaded on first use into the data volume (not baked into the public image)
-  - [ ] `/api/tts` chain: Gemini (best) → Piper (unlimited, local) → browser voice
-  - [ ] Skip Gemini TTS for the rest of the day once its daily quota is hit (no wasted round-trips)
+  - [x] `piper-tts` in the image; `cs_CZ-jirka-medium` downloaded on first use into the data volume (not baked into the public image)
+  - [x] `/api/tts`: Piper only by default (user decision: skip Gemini TTS altogether); Gemini optional via `TTS_MODELS`
+  - [x] If Gemini is enabled: skipped until its quota resets once the daily cap is hit
   - [ ] Check speed and memory on the 2-core server
 - [ ] 10. Proactive check-ins
 - [ ] 11. Home Assistant

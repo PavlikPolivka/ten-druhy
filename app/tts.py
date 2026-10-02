@@ -1,7 +1,7 @@
 """Text-to-speech for his replies, as WAV bytes.
 
-Chain: Gemini TTS (best voice, but free tier is 10 requests/day per model) → Piper (local Czech voice on the
-server, unlimited) → caller falls back to the browser voice.
+Default: Piper only (local Czech voice on the server, unlimited, private). Optional Gemini TTS in front of it
+via TTS_MODELS (free tier is only 10 requests/day per model). The browser voice is the caller's last resort.
 """
 
 import io

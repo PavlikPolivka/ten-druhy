@@ -18,7 +18,9 @@ EMBED_DIM = int(os.getenv("EMBED_DIM", "768"))
 
 # Gemini TTS (free tier: ~3 requests/min per model). No style prompt by default: any instruction prefix either gets
 # read aloud (2.5) or pushes the model into an English accent ("rvat" instead of "řvát"); plain text is fluent Czech.
-TTS_MODELS = [m for m in os.getenv("TTS_MODELS", "gemini-3.8-flash-tts,gemini-2.5-flash-preview-tts").split(",") if m]
+# Off by default (10 requests/day isn't worth it): read-aloud uses the local Piper voice only.
+# Set e.g. TTS_MODELS=gemini-3.8-flash-tts to put Gemini back in front of Piper.
+TTS_MODELS = [m for m in os.getenv("TTS_MODELS", "").split(",") if m]
 TTS_VOICE = os.getenv("TTS_VOICE", "Charon")
 TTS_STYLE = os.getenv("TTS_STYLE", "")
 
