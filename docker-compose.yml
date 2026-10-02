@@ -1,0 +1,37 @@
+services:
+  tendruhy:
+    build: .
+    container_name: tendruhy
+    env_file: .env
+    environment:
+      QDRANT_URL: http://tendruhy-qdrant:6333
+      DERIVED_DIR: /srv/data/derived
+      SESSIONS_DB: /srv/data/state/sessions.sqlite
+    volumes:
+      - ./data/derived:/srv/data/derived:ro
+      - ./data/state:/srv/data/state
+    depends_on:
+      - tendruhy-qdrant
+    networks:
+      - portal
+      - internal
+    mem_limit: 512m
+    restart: unless-stopped
+
+  tendruhy-qdrant:
+    image: qdrant/qdrant:latest
+    container_name: tendruhy-qdrant
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - internal
+    mem_limit: 512m
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
+
+networks:
+  portal:
+    external: true
+  internal:
