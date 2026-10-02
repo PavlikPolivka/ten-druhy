@@ -16,11 +16,11 @@ FALLBACK_MODELS = [m for m in os.getenv("FALLBACK_MODELS", "gemini-3.6-flash,gem
 EMBED_MODEL = os.getenv("EMBED_MODEL", "gemini-embedding-001")
 EMBED_DIM = int(os.getenv("EMBED_DIM", "768"))
 
-# Gemini TTS (free tier: ~3 requests/min per model). Voice picked from samples; style prompt must be English
-# (a Czech instruction gets read aloud).
+# Gemini TTS (free tier: ~3 requests/min per model). No style prompt by default: any instruction prefix either gets
+# read aloud (2.5) or pushes the model into an English accent ("rvat" instead of "řvát"); plain text is fluent Czech.
 TTS_MODELS = [m for m in os.getenv("TTS_MODELS", "gemini-3.8-flash-tts,gemini-2.5-flash-preview-tts").split(",") if m]
 TTS_VOICE = os.getenv("TTS_VOICE", "Charon")
-TTS_STYLE = os.getenv("TTS_STYLE", "Say at a brisk pace, in a dry, cynical, deadpan, deep gravelly male voice:")
+TTS_STYLE = os.getenv("TTS_STYLE", "")
 
 QDRANT_URL = os.getenv("QDRANT_URL", "")  # empty -> embedded local Qdrant at data/qdrant
 QDRANT_PATH = ROOT / "data" / "qdrant"

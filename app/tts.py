@@ -45,7 +45,7 @@ def synthesize(text: str) -> bytes:
     last = None
     for model in config.TTS_MODELS:  # each model has its own 3/min quota
         try:
-            r = llm.client().models.generate_content(model=model, contents=f"{config.TTS_STYLE} {text}", config=cfg)
+            r = llm.client().models.generate_content(model=model, contents=f"{config.TTS_STYLE} {text}".strip(), config=cfg)
             part = r.candidates[0].content.parts[0].inline_data
             audio = _wav(part.data, part.mime_type or "")
             with _lock:
