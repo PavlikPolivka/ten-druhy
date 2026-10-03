@@ -48,7 +48,8 @@ def client() -> genai.Client:
     if _client is None:
         if not config.GEMINI_API_KEY:
             raise RuntimeError("GEMINI_API_KEY is not set (see .env.example)")
-        _client = genai.Client(api_key=config.GEMINI_API_KEY)
+        # Without a timeout a stalled request hangs forever (seen: the embed job froze for hours).
+        _client = genai.Client(api_key=config.GEMINI_API_KEY, http_options=types.HttpOptions(timeout=60_000))
     return _client
 
 

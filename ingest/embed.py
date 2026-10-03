@@ -21,7 +21,11 @@ from app.retrieval import ensure_collection, qdrant
 from app.textnorm import sparse_vector
 from ingest.books import TEXT
 
-VECTORS = config.DERIVED_DIR / "vectors.jsonl"
+import os
+from pathlib import Path
+
+# Overridable so the job can run on the server, where data/derived is mounted read-only.
+VECTORS = Path(os.getenv("VECTORS_FILE", config.DERIVED_DIR / "vectors.jsonl"))
 # Free-tier embedding quota is tight and varies; adapt the batch size instead of guessing it.
 MAX_BATCH = 10
 PAUSE_S = 12
@@ -32,7 +36,8 @@ def embed_missing():
     done = set()
     if VECTORS.exists():
         done = {json.loads(l)["id"] for l in VECTORS.open()}
-    todo = [c for c in map(json.loads, (TEXT / "chunks.jsonl").open()) if c["id"] not in done]
+    src = TEXT / "chunks.jsonl" if (TEXT / "chunks.jsonl").exists() else config.DERIVED_DIR / "chunks.jsonl"
+    todo = [c for c in map(json.loads, src.open()) if c["id"] not in done]
     print(f"{len(done)} cached, {len(todo)} to embed")
     batch_size, i = 2, 0
     with VECTORS.open("a") as out:
