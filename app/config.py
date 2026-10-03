@@ -41,6 +41,9 @@ PROXY_SECRET = os.getenv("TD_PROXY_SECRET", "")
 # Admins (Authelia usernames): homelab watchdog alerts + server tools.
 ADMIN_USERS = [u for u in os.getenv("ADMIN_USERS", "pavel").split(",") if u]
 
+# Public base URL (links in announcements / audio clips for Twilio).
+PUBLIC_URL = os.getenv("PUBLIC_URL", "https://druhy.ppolivka.com").rstrip("/")
+
 # Home for weather questions without a place, and the morning brief.
 HOME_PLACE = os.getenv("HOME_PLACE", "Buštěhrad")
 

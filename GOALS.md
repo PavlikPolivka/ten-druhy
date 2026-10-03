@@ -161,6 +161,10 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] Collector installed on the host; data flowing every 5 min
   - [x] Real-use finding: a weak fallback model invented "telegraf → influxdb" in an alert → alerts are now his
         one-line opener (no facts allowed) + the exact fact lines from the watchdog
+- [x] 18c. Announcements for phone calls (user's garage-door Twilio flow)
+  - [x] `POST /v1/announce {event, context}` → his line (event stated plainly first + short remark from time/weather/
+        calendar, user's tone) + Piper WAV at a random public `/v1/clip/<id>.wav` that expires in 10 min
+  - [x] Tested: ~1–2 s, clip fetchable without key (Twilio `<Play>`), random clip 404, announce without key 401
 - [ ] 25. Home Assistant control
 - [ ] 26. Kulhánek adventure
 - [ ] 27. Family chat

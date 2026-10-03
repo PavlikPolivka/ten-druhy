@@ -10,6 +10,8 @@ Meant for the internal `portal` network (http://tendruhy:8000/v1) — it does no
 """
 
 import json
+import secrets
+import threading
 import time
 import uuid
 
@@ -17,7 +19,8 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
-from app import apikeys, tts
+from app import apikeys, calendar_ics, config, llm, memory, tts, web
+from app.prompt import TONE_RULES, TZ, now_line
 
 router = APIRouter(prefix="/v1")
 MODEL = "ten-druhy"
@@ -110,3 +113,70 @@ def speech(req: SpeechReq, authorization: str | None = Header(default=None)):
         raise HTTPException(400, {"error": {"message": "only wav is supported", "type": "invalid_request_error"}})
     audio, _ = tts.synthesize(req.input)
     return Response(audio, media_type="audio/wav")
+
+
+# ---- Announcements (e.g. a phone call via Twilio: "garážové dveře otevřeny") ----
+# Twilio's <Play> fetches audio with a plain GET and no auth, so clips get a random, unguessable URL that expires.
+
+CLIP_TTL_S = 600
+_clips: dict[str, tuple[float, bytes]] = {}
+_clips_lock = threading.Lock()
+
+ANNOUNCE_SYSTEM = (
+    "Jsi „Ten druhý“ – cynický vnitřní hlas uživatele z knih Jiřího Kulhánka. Oznamuješ mu nahlas (do telefonu) "
+    "událost. PRVNÍ věta musí tu událost jasně a srozumitelně říct (např. „Garážové dveře jsou otevřené.“). Pak "
+    "nanejvýš jedna krátká suchá poznámka k situaci (čas, počasí, co ho dnes čeká) – jen z podkladů, nic nevymýšlej. "
+    "Celkem max 2 věty, česky, hovorově, bez emoji a zkratek (bude se to číst nahlas). Vrať jen ten text.")
+
+
+class AnnounceReq(BaseModel):
+    event: str
+    context: str | None = None
+
+
+def _store_clip(audio: bytes) -> str:
+    cid = secrets.token_urlsafe(24)
+    now = time.time()
+    with _clips_lock:
+        for k in [k for k, (exp, _) in _clips.items() if exp < now]:
+            del _clips[k]
+        _clips[cid] = (now + CLIP_TTL_S, audio)
+    return cid
+
+
+@router.post("/announce")
+def announce(req: AnnounceReq, authorization: str | None = Header(default=None)):
+    """Event → his line (text) + a short-lived public WAV URL for Twilio <Play> / speakers."""
+    user = _auth(authorization)
+    ctx = [f"Událost: {req.event}", f"Teď je: {now_line()}"]
+    if req.context:
+        ctx.append(f"Kontext od volající aplikace: {req.context}")
+    try:
+        ctx.append("Počasí:\n" + web.weather())
+    except Exception:
+        pass
+    try:
+        if cal := calendar_ics.prompt_block(user):
+            ctx.append(cal)
+    except Exception:
+        pass
+    tone = memory.tone(user)[0]
+    system = ANNOUNCE_SYSTEM + (" " + TONE_RULES[tone] if tone in TONE_RULES else "")
+    try:
+        text = llm.generate(system, "\n\n".join(ctx), temperature=0.8, patient=False).strip()
+    except Exception:
+        text = ""
+    text = text or (req.event[:1].upper() + req.event[1:] + ".")  # never fail the announcement itself
+    audio, _ = tts.synthesize(text)
+    clip = _store_clip(audio)
+    return {"text": text, "audio_url": f"{config.PUBLIC_URL}/v1/clip/{clip}.wav", "expires_in": CLIP_TTL_S}
+
+
+@router.get("/clip/{name}")
+def clip(name: str):
+    """Public on purpose (Twilio can't send our key); the random name is the secret and it expires."""
+    with _clips_lock:
+        hit = _clips.get(name.removesuffix(".wav"))
+    if not hit or hit[0] < time.time():
+        raise HTTPException(404)
+    return Response(hit[1], media_type="audio/wav", headers={"Cache-Control": "no-store"})

@@ -67,3 +67,12 @@ curl http://tendruhy:8000/v1/audio/speech -H "Authorization: Bearer td_…" -H "
 - `GET /v1/models` → `ten-druhy`; `POST /v1/audio/speech` → WAV (Piper).
 - Home Assistant: any integration that accepts a custom OpenAI base URL (e.g. "Extended OpenAI Conversation") works.
 - n8n: "OpenAI" credentials with base URL `http://tendruhy:8000/v1`.
+
+### Announcements (phone calls / speakers)
+`POST /v1/announce` with `{"event": "garážové dveře otevřeny", "context": "…optional…"}` returns his line plus a
+public WAV link that expires in 10 minutes (Twilio's `<Play>` can't send our API key; the random URL is the secret):
+```json
+{"text": "Garážové dveře jsou otevřené. …", "audio_url": "https://druhy.ppolivka.com/v1/clip/<random>.wav", "expires_in": 600}
+```
+Twilio: answer the call with `<Response><Play>{audio_url}</Play></Response>`. The first sentence always states the
+event plainly; the rest is a short remark from time, weather and today's calendar. Takes ~2–4 s.
