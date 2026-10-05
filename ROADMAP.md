@@ -28,6 +28,7 @@ per-model daily quotas), 2-core homelab box, identity comes from Authelia (`Remo
 | 19 | **Journal & weekly review** – evening question, Sunday recap from memory | 1–2 h | ✅ done |
 | 21 | **Morning brief** – today's events (calendar + memory) + weather for Buštěhrad; 7:00 weekdays, 9:00 weekends | 2 h | ✅ done |
 | 24 | **Homelab watchdog** – alerts in his voice: backups, disk/RAM/load, containers down/looping, certs/tunnel/OS updates | 2–3 h | ✅ done |
+| 31 | **Memory 2.0 + dreams** – aggressive episodic capture, nightly "dream" consolidation (merge/forget/insights/core profile/open loops/REM dream), memory screen with tabs, dreams in the morning brief (toggle). Design: [docs/MEMORY.md](docs/MEMORY.md) | 1–2 days | |
 | 25 | **Home Assistant** – control + sensors + announce on speakers (was #11) | 2–3 h | |
 | 26 | **Kulhánek adventure** – interactive text adventure in the books' world, he narrates | 2–3 h | |
 | 27 | **Family chat** – one shared conversation for the family, with him in it | 3 h | |

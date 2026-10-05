@@ -165,6 +165,7 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] `POST /v1/announce {event, context}` → his line (event stated plainly first + short remark from time/weather/
         calendar, user's tone) + Piper WAV at a random public `/v1/clip/<id>.wav` that expires in 10 min
   - [x] Tested: ~1–2 s, clip fetchable without key (Twilio `<Play>`), random clip 404, announce without key 401
+- [ ] 31. Memory 2.0 + dreams (design: docs/MEMORY.md) — 4 stages
 - [ ] 25. Home Assistant control
 - [ ] 26. Kulhánek adventure
 - [ ] 27. Family chat
