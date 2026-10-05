@@ -36,7 +36,9 @@ Rozhodni, jestli má smysl se ozvat PRÁVĚ TEĎ. Ozvi se jen s dobrým důvodem
 proběhla / blíží se (deploy, narozeniny, doktor, výlet, zkouška), nebo něco, co nechal viset. Žádné obecné „jak se máš“. \
 NIKDY nevymýšlej, jak něco dopadlo – výsledek neznáš, tak se zeptej („Tak co, spadlo to?“). Když nic takového není, neozývej se. Neozývej se kvůli věcem, ke kterým ses už ozval (viz poslední ozvání).
 
-Vrať JSON: {"send": true|false, "reason": "<proč, krátce>", "message": "<zpráva v jeho stylu, pokud send>"}"""
+Máš i OTEVŘENÉ SMYČKY (věci, na které ses chtěl zeptat, s datem) – ty jsou nejlepší důvod se ozvat, když přišel jejich čas.
+Vrať JSON: {"send": true|false, "reason": "<proč, krátce>", "message": "<zpráva v jeho stylu, pokud send>",
+"loop_id": <id smyčky, kterou zpráva řeší, nebo null>}"""
 
 _ready = False
 
@@ -84,7 +86,7 @@ def evaluate(user: str, force: bool = False) -> dict:
         why = _due(user)
         if why:
             return {"send": False, "reason": why, "skipped": True}
-    facts = "\n".join(f"- {f['text']}" for f in reversed(memory.visible(user))) or "(nic)"
+    facts = memory.prompt_block(user) or "(nic)"
     recent = _q("SELECT ts, message FROM checkins WHERE user = ? AND sent = 1 ORDER BY id DESC LIMIT 5", (user,))
     recent_txt = "\n".join(f"- {ts} UTC: {m}" for ts, m in recent) or "(zatím nikdy)"
     titles = "\n".join(f"- {c['title'] or c['preview']} ({c['updated']} UTC)" for c in sessions.conversations(user, 5)) or "(nic)"
@@ -95,7 +97,11 @@ def evaluate(user: str, force: bool = False) -> dict:
         cal = calendar_ics.summary(user, today, today + timedelta(days=2)) if calendar_ics.url(user) else ""
     except Exception:
         cal = ""
-    user_msg = (f"Teď je: {now_line()}\n\nCo o něm víš:\n{facts}\n\nKalendář (dnes a zítra):\n{cal or '(nic / nepropojený)'}\n\n"
+    from app import dream
+    loops = "\n".join(f"[{l['id']}] {l['text']}" + (f" (kdy: {l['due']})" if l["due"] else "")
+                      for l in dream.open_items(user, "loop")) or "(žádné)"
+    user_msg = (f"Teď je: {now_line()}\n\nCo o něm víš:\n{facts}\n\nOtevřené smyčky:\n{loops}\n\n"
+                f"Kalendář (dnes a zítra):\n{cal or '(nic / nepropojený)'}\n\n"
                 f"Poslední konverzace:\n{titles}\n\n"
                 f"Poslední tvoje ozvání:\n{recent_txt}")
     from app.prompt import TONE_RULES
@@ -103,6 +109,8 @@ def evaluate(user: str, force: bool = False) -> dict:
     out = json.loads(llm.generate(system, user_msg, json_mode=True, temperature=0.7, patient=False))
     send, msg, reason = bool(out.get("send")), (out.get("message") or "").strip(), (out.get("reason") or "")[:200]
     cid = None
+    if send and msg and out.get("loop_id"):
+        dream._q("UPDATE open_loops SET status = 'done' WHERE id = ? AND user = ?", (out["loop_id"], user))
     if send and msg:
         cid = sessions.create(user)
         sessions.add(cid, "assistant", msg)
@@ -120,6 +128,11 @@ def _loop():
             memory.sweep()
         except Exception as e:
             print(f"  [memory] sweep: {str(e)[:100]}", flush=True)
+        try:
+            from app import dream
+            dream.tick()
+        except Exception as e:
+            print(f"  [dream] {str(e)[:100]}", flush=True)
         try:
             from app import rituals
             rituals.tick()

@@ -165,7 +165,22 @@ Details and effort estimates: [ROADMAP.md](ROADMAP.md).
   - [x] `POST /v1/announce {event, context}` → his line (event stated plainly first + short remark from time/weather/
         calendar, user's tone) + Piper WAV at a random public `/v1/clip/<id>.wav` that expires in 10 min
   - [x] Tested: ~1–2 s, clip fetchable without key (Twilio `<Play>`), random clip 404, announce without key 401
-- [ ] 31. Memory 2.0 + dreams (design: docs/MEMORY.md) — 4 stages
+- [x] 31. Memory 2.0 + dreams (design: docs/MEMORY.md)
+  - [x] Stage 1: episodic capture after EVERY exchange (Flash-Lite, aggressive); facts table extended (kind, category,
+        confidence, evidence, importance, pinned, status, valid_until, sources, entities, embedding); migration of old facts;
+        prompt = core profile + relevant facts (embedding + keyword + importance) + upcoming dated facts + undreamt episodes;
+        tools `memory_remember` / `memory_forget`
+  - [x] Stage 2: nightly dream at 4:00 (`gemini-3.8-flash`, Pro is 429 on free tier): sorting (episodes → facts, reinforce,
+        merge, archive past events), deterministic forgetting curve, core profile rewrite; every op in `fact_history` with
+        undo; "💤 snít teď" button
+  - [x] Stage 3: inferences (confirm ✓ / reject ✗ → never re-inferred), open loops → check-ins (marked done when used),
+        contradiction questions → asked naturally once
+  - [x] Stage 4: REM dream mixing the day with the books (RAG), dream journal + 🔊, dreams in the morning brief (toggle in
+        ⚙ Deník and in the Sny tab), chronicle (monthly), people cards, style notes from 👍/👎 → prompt
+  - [x] Memory screen: tabs Profil / Fakta (categories, odhady, pin, edit, delete, add, archive) / Lidé / Kronika / Sny /
+        Noc (changelog + undo) / Smyčky (+ reminders), search across facts, archive, episodes, dreams
+  - [x] Tested on a copy of the real DB: migration, backfill (65 episodes → 11 facts, 3 dated events, 2 loops, 1 question,
+        people), first dream fixed (it over-compressed dated plans), UI screenshots desktop + phone (headless Chromium)
 - [ ] 25. Home Assistant control
 - [ ] 26. Kulhánek adventure
 - [ ] 27. Family chat

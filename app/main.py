@@ -34,6 +34,10 @@ from app.openai_api import router as openai_router  # noqa: E402  (/v1/*, bearer
 
 app.include_router(openai_router)
 
+from app.memory_api import router as memory_router  # noqa: E402  (/api/memory/*, the memory screen)
+
+app.include_router(memory_router)
+
 
 def _header(request: Request, name: str) -> str:
     """Authelia identity headers (via Caddy copy_headers). Starlette decodes headers as latin-1."""
@@ -325,7 +329,7 @@ def reply_stream(user: str, name: str, prev: list[dict], message: str, img: byte
     outside, links = _outside(r)
     if client_context:
         outside = "\n\n".join(b for b in (outside, "Kontext od aplikace, která tě volá:\n" + client_context) if b)
-    mem_block = "\n\n".join(b for b in (memory.prompt_block(user), calendar_ics.prompt_block(user)) if b)
+    mem_block = "\n\n".join(b for b in (memory.prompt_block(user, message), calendar_ics.prompt_block(user)) if b)
     system = system_prompt(chunks, name, mem_block, outside, memory.tone(user)[0], done)
     text_in = message.strip() or "(posílá ti fotku, bez komentáře)"
     convo = prev + [{"role": "user", "content": text_in, "image": (img, "image/jpeg") if img else None}]

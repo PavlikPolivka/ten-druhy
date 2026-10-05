@@ -84,6 +84,35 @@
   @keyframes pulse { 50% { opacity: .6; } }
   #tts.on { color: var(--ink); border-color: var(--ink); }
   #drawer.wide .panel { width: min(600px, 100%); }
+  #drawer.xwide .panel { width: min(860px, 100%); }
+  .mhead { position: sticky; top: 0; background: var(--bg); z-index: 1; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  .tabs, .chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tabs button, .chips button { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 999px;
+                                 padding: 3px 10px; font: .8rem system-ui, sans-serif; }
+  .tabs button.on, .chips button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chips { padding: 10px 16px 4px; }
+  .msearch { width: 100%; margin-top: 8px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line);
+             background: var(--panel); color: var(--ink); font: .9rem system-ui, sans-serif; }
+  .mbody { padding-bottom: 24px; }
+  .mbody .msearch { width: calc(100% - 32px); margin: 12px 16px; }
+  .hint { color: var(--muted); font: .85rem system-ui, sans-serif; padding: 8px 16px 0; margin: 0; }
+  .mprofile, .fedit { width: calc(100% - 32px); margin: 8px 16px; padding: 8px; border-radius: 8px; border: 1px solid var(--line);
+                      background: var(--panel); color: var(--ink); font: .95rem/1.5 Georgia, serif; }
+  .mbody > .hbtn { margin: 0 16px; }
+  .mrow { padding: 8px 16px; border-bottom: 1px solid var(--line); font-size: .95rem; }
+  .mrow.small { font-size: .85rem; }
+  .mrow small, .mfact small, .card small { color: var(--muted); font-family: system-ui, sans-serif; font-size: .75rem; }
+  .mrow.undone { opacity: .45; text-decoration: line-through; }
+  .mfact { display: flex; gap: 8px; align-items: flex-start; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .mfact .t { flex: 1; min-width: 0; }
+  .mfact.inf .ftext { font-style: italic; }
+  .facts { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  .facts .del { font-size: .85rem; background: none; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; color: var(--muted); }
+  .facts .del.arm { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .mrow .del { margin-left: 8px; background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); }
+  .hbtn.on { border-color: var(--accent); color: var(--accent); }
+  .card { margin: 10px 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  .card p { margin: 6px 0 0; }
   h3.sec { margin: 0; padding: 14px 16px 4px; font: 600 .75rem system-ui, sans-serif; letter-spacing: .06em;
            text-transform: uppercase; color: var(--accent); }
   .hbtn { min-width: 34px; }
@@ -117,7 +146,7 @@
   <div><h1>Ten<span>,</span> druhý</h1><small>hlas, co ti radí, i když nechceš</small></div>
   <div class="actions">
     <button id="tts" class="hbtn" title="Číst odpovědi nahlas">🔈</button>
-    <button id="mem" class="hbtn" title="Co si o tobě pamatuju (paměť, připomínky)">🧠</button>
+    <button id="mem" class="hbtn" title="Paměť – co o tobě vím, sny, připomínky">🧠</button>
     <button id="hist" class="hbtn" title="Předchozí konverzace">🕘</button>
     <button id="cfg" class="hbtn" title="Nastavení">⚙</button>
     <button id="reset" class="hbtn" title="Nová konverzace (stará zůstane uložená)">✚</button>
@@ -349,56 +378,188 @@ async function pushToggle() {
   row.append(cb, txt); return row;
 }
 
-async function openMemory() {
-  dtitle.textContent = 'Co o tobě vím';
-  drawer.classList.remove('wide'); drawer.classList.add('open');
+// ---- Memory screen (design: docs/MEMORY.md) ----
+const OPS = { add: '+ přidáno', update: '✎ upraveno', reinforce: '↑ posíleno', merge: '⇄ sloučeno', merged_away: '⇄ sloučeno do jiného',
+              archive: '↧ archivováno', decay: '↧ vybledlo', forget: '− zapomenuto', edit: '✎ ručně', confirm: '✓ potvrzeno',
+              reject: '✗ odmítnuto' };
+const KIND = { fact: '', inference: 'odhad', event: 'událost', preference: 'preference', routine: 'zvyk', goal: 'cíl', self: 'jeho' };
+let memTab = 'fakta', memCat = 'vše';
+
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) { if (k === 'class') e.className = v; else if (k.startsWith('on')) e[k] = v; else if (v != null) e.setAttribute(k, v); }
+  for (const k of kids.flat()) if (k != null) e.append(k.nodeType ? k : document.createTextNode(k));
+  return e;
+}
+const api = (url, method = 'GET', body) => fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {},
+                                                         body: body ? JSON.stringify(body) : undefined }).then(r => r.json());
+const dots = c => '●'.repeat(Math.round(c * 5)) + '○'.repeat(5 - Math.round(c * 5));
+
+async function openMemory(tab) {
+  if (tab) memTab = tab;
+  dtitle.textContent = 'Paměť';
+  drawer.classList.add('open', 'wide', 'xwide');
   convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
-  let st = { items: [] };
-  try { st = await (await fetch('api/memories')).json(); } catch (e) {}
+  let o;
+  try { o = await api('api/memory/overview'); } catch (e) { convs.innerHTML = '<p class="empty">Nejde načíst.</p>'; return; }
   convs.innerHTML = '';
-  let rems = [];
-  try { rems = await (await fetch('api/reminders')).json(); } catch (e) {}
-  if (rems.length) {
-    section('Připomínky');
-    for (const r of rems) {
-      const row = document.createElement('div'); row.className = 'conv'; row.style.cursor = 'default';
-      const t = document.createElement('div'); t.className = 't';
-      const b = document.createElement('span'); b.textContent = r.text;
-      const sm = document.createElement('small'); sm.textContent = ' · ' + r.when;
-      t.append(b, sm); row.appendChild(t);
-      const del = document.createElement('button');
-      twoStep(del, 'zrušit', async () => { await fetch('api/reminders/' + r.id, { method: 'DELETE' }).catch(() => {}); row.remove(); });
-      row.appendChild(del); convs.appendChild(row);
-    }
+  const tabs = el('div', { class: 'tabs' });
+  for (const [k, label] of [['profil', 'Profil'], ['fakta', 'Fakta'], ['lide', 'Lidé'], ['kronika', 'Kronika'], ['sny', 'Sny'],
+                            ['noc', 'Noc'], ['smycky', 'Smyčky']])
+    tabs.append(el('button', { type: 'button', class: k === memTab ? 'on' : '', onclick: () => openMemory(k) }, label));
+  const search = el('input', { class: 'msearch', placeholder: '🔍 hledat v paměti…' });
+  search.onkeydown = e => { if (e.key === 'Enter' && search.value.trim()) memSearch(search.value.trim(), body); };
+  const body = el('div', { class: 'mbody' });
+  convs.append(el('div', { class: 'mhead' }, tabs, search), body);
+  ({ profil: memProfile, fakta: memFacts, lide: memPeople, kronika: memChronicle, sny: memDreams, noc: memNight,
+     smycky: memLoops })[memTab](o, body);
+}
+
+function memProfile(o, body) {
+  const p = o.profile;
+  body.append(el('p', { class: 'hint' }, p ? 'Tohle o tobě vím v kostce. Přepisuju to každou noc (naposledy ' + when(p.updated) + '). Klidně oprav.'
+                                            : 'Profil napíšu po první noci (sen běží ve 4:00, nebo ho spusť v záložce Noc).'));
+  const ta = el('textarea', { class: 'mprofile', rows: 9 }); ta.value = p ? p.text : '';
+  const save = el('button', { class: 'hbtn', type: 'button', onclick: async () => {
+    await api('api/memory/profile', 'PUT', { text: ta.value }); save.textContent = 'uloženo ✓'; } }, 'uložit');
+  body.append(ta, save);
+  if (o.upcoming.length) {
+    body.append(el('h3', { class: 'sec' }, 'Blíží se'));
+    for (const f of o.upcoming) body.append(el('div', { class: 'mrow' }, el('b', {}, f.valid_until + ' '), f.text));
   }
-  section('Co si pamatuju');
-  if (!st.items.length) {
-    convs.insertAdjacentHTML('beforeend', '<p class="empty" style="margin-top:2em">Zatím nic. Musíš mi něco říct, chytráku.</p>');
-    return;
-  }
-  for (const m of st.items) {
-    const row = document.createElement('div'); row.className = 'conv'; row.style.cursor = 'default';
-    const t = document.createElement('div'); t.className = 't';
-    const b = document.createElement('span');
-    if (m.scope === 'family') { const f = document.createElement('span'); f.className = 'fam'; f.textContent = 'rodina'; t.appendChild(f); }
-    b.textContent = m.text; t.appendChild(b);
-    if (!m.own) { const sm = document.createElement('small'); sm.textContent = ' · od ' + m.user; t.appendChild(sm); }
-    row.appendChild(t);
-    if (m.own) {
-      const del = document.createElement('button');
-      twoStep(del, 'zapomenout', async () => { await fetch('api/memories/' + m.id, { method: 'DELETE' }).catch(() => {}); row.remove(); });
-      row.appendChild(del);
-    }
-    convs.appendChild(row);
+  if (o.episodes.length) {
+    body.append(el('h3', { class: 'sec' }, 'Čerstvé postřehy (neutříděné, v noci je roztřídím)'));
+    for (const e of [...o.episodes].reverse()) body.append(el('div', { class: 'mrow small' }, el('small', {}, when(e.ts) + ' · '), e.text));
   }
 }
-function toggleRow(label, key, on) {
-  const row = document.createElement('label'); row.className = 'share';
-  const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!on;
-  const txt = document.createElement('span'); txt.textContent = label;
-  cb.onchange = () => fetch('api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                              body: JSON.stringify({ [key]: cb.checked }) }).catch(() => {});
-  row.append(cb, txt); return row;
+
+function factRow(f, refresh) {
+  const kind = KIND[f.kind] ? el('span', { class: 'fam' }, KIND[f.kind]) : null;
+  const meta = el('small', {}, `${f.category} · ${dots(f.confidence)} · ${f.evidence}×` + (f.valid_until ? ' · ' + f.valid_until : '')
+                                + (f.own ? '' : ' · od ' + f.user));
+  const text = el('span', { class: 'ftext' }, f.text);
+  const row = el('div', { class: 'mfact' + (f.kind === 'inference' ? ' inf' : '') }, el('div', { class: 't' }, kind, text, el('br'), meta));
+  if (!f.own) return row;
+  const acts = el('div', { class: 'facts' });
+  if (f.kind === 'inference') {
+    acts.append(el('button', { class: 'hbtn', type: 'button', title: 'Je to pravda',
+                               onclick: async () => { await api(`api/memory/facts/${f.id}/confirm`, 'POST'); refresh(); } }, '✓ pravda'),
+                el('button', { class: 'hbtn', type: 'button', title: 'Nesmysl – už to neodvozuj',
+                               onclick: async () => { await api(`api/memory/facts/${f.id}/reject`, 'POST'); row.remove(); } }, '✗ nesmysl'));
+  }
+  acts.append(
+    el('button', { class: 'hbtn' + (f.pinned ? ' on' : ''), type: 'button', title: f.pinned ? 'Připíchnuté – nikdy nezapomenu' : 'Připíchnout (nikdy nezapomenout)',
+                   onclick: async () => { await api(`api/memory/facts/${f.id}`, 'PATCH', { pinned: !f.pinned }); refresh(); } }, '📌'),
+    el('button', { class: 'hbtn', type: 'button', title: 'Upravit', onclick: () => {
+      const inp = el('textarea', { rows: 2, class: 'fedit' }); inp.value = f.text;
+      const ok = el('button', { class: 'hbtn', type: 'button', onclick: async () => {
+        await api(`api/memory/facts/${f.id}`, 'PATCH', { text: inp.value }); refresh(); } }, 'uložit');
+      text.replaceWith(el('span', {}, inp, ok)); } }, '✎'));
+  const del = el('button'); twoStep(del, '🗑', async () => { await api(`api/memory/facts/${f.id}`, 'DELETE'); row.remove(); });
+  acts.append(del); row.append(acts);
+  return row;
+}
+
+function memFacts(o, body) {
+  const cats = ['vše', 'odhady', ...o.categories.filter(c => o.facts.some(f => f.category === c))];
+  const bar = el('div', { class: 'chips' });
+  for (const c of cats) bar.append(el('button', { type: 'button', class: c === memCat ? 'on' : '', onclick: () => { memCat = c; openMemory(); } }, c));
+  body.append(bar);
+  const list = o.facts.filter(f => memCat === 'vše' || (memCat === 'odhady' ? f.kind === 'inference' : f.category === memCat));
+  if (!list.length) body.append(el('p', { class: 'empty' }, 'Nic. Musíš mi něco říct, chytráku.'));
+  for (const f of list) body.append(factRow(f, () => openMemory()));
+  const add = el('input', { class: 'msearch', placeholder: '+ přidat fakt („Nesnáší koriandr.“) a Enter' });
+  add.onkeydown = async e => { if (e.key === 'Enter' && add.value.trim().length > 1) { await api('api/memory/facts', 'POST', { text: add.value.trim() }); openMemory(); } };
+  body.append(add);
+  const arch = el('button', { class: 'hbtn', type: 'button', onclick: async () => {
+    const a = await api('api/memory/archive'); arch.replaceWith(el('h3', { class: 'sec' }, 'Archiv (minulé a vybledlé)'),
+      ...a.map(f => { const r = factRow({ ...f, own: true }, () => openMemory());
+                      r.querySelector('.facts').prepend(el('button', { class: 'hbtn', type: 'button', title: 'Vrátit mezi aktivní',
+                        onclick: async () => { await api(`api/memory/facts/${f.id}`, 'PATCH', { status: 'active' }); openMemory(); } }, '↥')); return r; })); } },
+    `archiv (${o.archived_count})`);
+  if (o.archived_count) body.append(arch);
+}
+
+async function memPeople(o, body) {
+  const ps = await api('api/memory/people');
+  if (!ps.length) { body.append(el('p', { class: 'empty' }, 'Lidi z tvýho života si poskládám v noci.')); return; }
+  for (const p of ps) body.append(el('div', { class: 'card' }, el('b', {}, p.name), el('small', {}, ' · ' + (p.relation || '')),
+                                     el('p', {}, p.summary || '')));
+}
+
+async function memChronicle(o, body) {
+  const cs = await api('api/memory/chronicle');
+  if (!cs.length) body.append(el('p', { class: 'hint' }, 'Kroniku píšu začátkem každého měsíce za ten předchozí.'));
+  for (const c of cs) body.append(el('div', { class: 'card' }, el('b', {}, c.month), el('p', {}, c.text)));
+}
+
+async function memDreams(o, body) {
+  const t = el('label', { class: 'share' }, el('input', { type: 'checkbox', ...(o.dreams_in_brief ? { checked: '' } : {}),
+    onchange: e => api('api/memory/settings', 'POST', { dreams_in_brief: e.target.checked }) }),
+    el('span', {}, 'Vyprávět sny v ranním přehledu'));
+  body.append(t);
+  const ds = (await api('api/memory/dreams')).filter(d => d.dream_text);
+  if (!ds.length) body.append(el('p', { class: 'empty' }, 'Zatím se mi nic nezdálo. Sním ve 4:00.'));
+  const nightOf = ts => new Date(ts.replace(' ', 'T') + 'Z').toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' });
+  for (const d of ds) body.append(el('div', { class: 'card' }, el('b', {}, 'Noc na ' + nightOf(d.ts)),
+    el('button', { class: 'hbtn', type: 'button', style: 'float:right', onclick: () => { unlockAudio(); speak(d.dream_text, null); } }, '🔊'),
+    el('p', {}, d.dream_text)));
+}
+
+async function memNight(o, body) {
+  const run = el('button', { class: 'hbtn', type: 'button', onclick: async () => {
+    const r = await api('api/memory/dream', 'POST'); run.textContent = r.started ? 'sním… (minuta, dvě)' : (r.reason || 'nejde');
+    if (r.started) setTimeout(() => openMemory('noc'), 60000); } }, '💤 snít teď');
+  body.append(el('p', { class: 'hint' }, 'Co jsem v noci přeskládal. Každou změnu můžeš vrátit. Sen běží sám ve 4:00. '), run);
+  const [ds, ch] = await Promise.all([api('api/memory/dreams'), api('api/memory/changes?limit=300')]);
+  const byDream = {};
+  for (const c of ch) (byDream[c.dream_id || 'ruční'] ||= []).push(c);
+  for (const d of ds) {
+    const items = byDream[d.id] || [];
+    const st = d.stats || {};
+    const night = new Date(d.ts.replace(' ', 'T') + 'Z');
+    body.append(el('h3', { class: 'sec' }, `Noc ${night.toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })}, ${night.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}` + (d.error ? ' – nepovedlo se' : ` · ${st.episodes || 0} postřehů → +${st.add || 0} ⇄${st.merge || 0} ↧${(st.archive || 0) + (st.decay || 0)} −${st.forget || 0}`)));
+    if (d.error) body.append(el('p', { class: 'err' }, d.error));
+    for (const c of items) body.append(changeRow(c));
+  }
+  if (byDream['ruční']) { body.append(el('h3', { class: 'sec' }, 'Ruční změny')); for (const c of byDream['ruční'].slice(0, 30)) body.append(changeRow(c)); }
+}
+
+function changeRow(c) {
+  const txt = c.op === 'add' || c.op === 'confirm' ? c.after : c.before && c.after && c.before !== c.after ? `${c.before} → ${c.after}` : (c.before || c.after);
+  const row = el('div', { class: 'mrow' + (c.undone ? ' undone' : '') }, el('small', {}, (OPS[c.op] || c.op) + ' '), txt || '',
+                 c.reason ? el('small', {}, ' – ' + c.reason) : null);
+  if (!c.undone) row.append(el('button', { class: 'hbtn', type: 'button', style: 'margin-left:8px', onclick: async () => {
+    const r = await api(`api/memory/undo/${c.id}`, 'POST'); if (r.ok) row.classList.add('undone'); } }, 'vrátit'));
+  return row;
+}
+
+async function memLoops(o, body) {
+  body.append(el('p', { class: 'hint' }, 'Na tohle se tě časem zeptám (smyčky si plánuju v noci).'));
+  for (const l of o.loops) {
+    const row = el('div', { class: 'mrow' }, el('small', {}, (l.kind === 'question' ? '❓ ' : '↻ ') + (l.due ? l.due + ' ' : '')), l.text);
+    row.append(el('button', { class: 'hbtn', type: 'button', style: 'margin-left:8px', onclick: () => {
+      drawer.classList.remove('open'); q.value = l.text.replace(/\?$/, '') + ' – zeptej se mě na to'; q.focus(); } }, 'zeptej se teď'),
+      el('button', { class: 'hbtn', type: 'button', onclick: async () => { await api(`api/memory/loops/${l.id}`, 'POST', { status: 'dismissed' }); row.remove(); } }, 'už ne'));
+    body.append(row);
+  }
+  if (!o.loops.length) body.append(el('p', { class: 'empty' }, 'Teď nic neřeším.'));
+  let rems = [];
+  try { rems = await api('api/reminders'); } catch (e) {}
+  body.append(el('h3', { class: 'sec' }, 'Připomínky'));
+  if (!rems.length) body.append(el('p', { class: 'hint' }, 'Žádné. Řekni mi „připomeň mi…“.'));
+  for (const r of rems) {
+    const row = el('div', { class: 'mrow' }, el('small', {}, r.when + ' '), r.text);
+    const del = el('button'); twoStep(del, 'zrušit', async () => { await fetch('api/reminders/' + r.id, { method: 'DELETE' }).catch(() => {}); row.remove(); });
+    row.append(del); body.append(row);
+  }
+}
+
+async function memSearch(q, body) {
+  body.innerHTML = '';
+  const hits = await api('api/memory/search?q=' + encodeURIComponent(q));
+  body.append(el('h3', { class: 'sec' }, `Hledám „${q}“ – ${hits.length} výsledků`));
+  for (const h of hits) body.append(el('div', { class: 'mrow' }, el('small', {}, h.type + (h.ts ? ' · ' + when(h.ts) : '') + ' '), h.text));
 }
 
 function section(title, ...rows) {
@@ -408,7 +569,7 @@ function section(title, ...rows) {
 
 async function openSettings() {
   dtitle.textContent = 'Nastavení';
-  drawer.classList.add('open', 'wide');
+  drawer.classList.remove('xwide'); drawer.classList.add('open', 'wide');
   convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
   let st = { share_family: false, items: [] };
   try { st = await (await fetch('api/memories')).json(); } catch (e) {}
@@ -425,6 +586,7 @@ async function openSettings() {
   section('Kalendář', calendarRow(st.calendar || {}));
   section('Deník',
     toggleRow('Ráno (7:00, o víkendu 9:00) ti řeknu, co tě dnes čeká a jaké bude počasí.', 'brief', st.brief),
+    dreamToggle(),
     toggleRow('Večer (kolem 20:30) se zeptám, jak jsi přežil den. Co mi řekneš, si zapamatuju.', 'journal', st.journal),
     toggleRow('V neděli večer ti shrnu týden a mrknu na ten příští.', 'weekly', st.weekly));
   section('Rodina', share);
@@ -432,11 +594,11 @@ async function openSettings() {
 }
 document.getElementById('cfg').onclick = openSettings;
 
-document.getElementById('mem').onclick = openMemory;
+document.getElementById('mem').onclick = () => openMemory();
 
 async function openHistory() {
   dtitle.textContent = 'Na co jsme už mysleli';
-  drawer.classList.remove('wide'); drawer.classList.add('open'); convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
+  drawer.classList.remove('wide', 'xwide'); drawer.classList.add('open'); convs.innerHTML = '<p class="empty" style="margin-top:2em">…</p>';
   let list = [];
   try { list = await (await fetch('api/conversations')).json(); } catch (e) {}
   convs.innerHTML = list.length ? '' : '<p class="empty" style="margin-top:2em">Zatím nic. Jsi docela nudnej.</p>';
@@ -605,8 +767,9 @@ function watchMemory(el, conv, mark) {
       if (!fresh.length) return;
       fresh.forEach(m => shown.add(m.id));
       let tag = el.querySelector('.mem');
-      if (!tag) { tag = document.createElement('span'); tag.className = 'mem'; tag.title = 'Spravuješ v „paměť“'; el.appendChild(tag); }
-      tag.textContent = '🧠 zapamatoval jsem si: ' + [...shown].map(id => items.find(m => m.id === id)?.text).filter(Boolean).join(' · ');
+      if (!tag) { tag = document.createElement('span'); tag.className = 'mem'; tag.title = 'Otevřít paměť'; tag.style.cursor = 'pointer';
+                  tag.onclick = () => openMemory('profil'); el.appendChild(tag); }
+      tag.textContent = '🧠 všiml jsem si: ' + [...shown].map(id => items.find(m => m.id === id)?.text).filter(Boolean).join(' · ');
     } catch (e) {}
   };
   [4000, 10000, 20000].forEach(ms => setTimeout(check, ms));  // extraction takes longer when models fall back

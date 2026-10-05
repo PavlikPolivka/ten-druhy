@@ -41,6 +41,9 @@ PROXY_SECRET = os.getenv("TD_PROXY_SECRET", "")
 # Admins (Authelia usernames): homelab watchdog alerts + server tools.
 ADMIN_USERS = [u for u in os.getenv("ADMIN_USERS", "pavel").split(",") if u]
 
+# The nightly memory dream (Pro is 429 on the free tier → strongest Flash, it thinks by default).
+DREAM_MODEL = os.getenv("DREAM_MODEL", "gemini-3.8-flash")
+
 # Public base URL (links in announcements / audio clips for Twilio).
 PUBLIC_URL = os.getenv("PUBLIC_URL", "https://druhy.ppolivka.com").rstrip("/")
 

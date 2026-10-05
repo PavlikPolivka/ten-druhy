@@ -1,6 +1,6 @@
 # Memory 2.0 + dreams — design
 
-Status: designed 2026-10-06, not built yet. Roadmap item #31.
+Status: built 2026-10-06 (all 4 stages). Roadmap item #31. Facts live in the extended `memories` table.
 
 ## Why
 After four days of use the memory held 6 facts: the extractor is stingy, the store is a flat list, all facts are

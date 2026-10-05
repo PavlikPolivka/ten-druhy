@@ -73,7 +73,7 @@ def _deliver(user: str, kind: str, period: str, title: str, text: str) -> str:
 
 
 def _facts(user: str) -> str:
-    return "\n".join(f"- {f['text']}" for f in reversed(memory.visible(user))) or "(nic)"
+    return memory.prompt_block(user) or "(nic)"
 
 
 def journal(user: str) -> str:
@@ -101,7 +101,14 @@ def brief(user: str) -> str:
         weather = "(počasí se nepodařilo načíst)"
     ctx = (f"Teď je: {now_line()}\n\nDnešní kalendář:\n{cal or '(nic / nepropojený)'}\n\n"
            f"Co o něm víš (hledej, co je na dnešek):\n{_facts(user)}\n\nPočasí:\n{weather}")
-    text = llm.generate(BRIEF_SYSTEM, ctx, temperature=0.8, patient=False).strip()
+    from app import dream
+    last = dream.last_dream(user) if dream.dreams_in_brief(user) else None
+    system = BRIEF_SYSTEM
+    if last and last.get("dream_text") and last["ts"][:10] >= (today - timedelta(days=1)).isoformat():
+        ctx += f"\n\nTvůj dnešní sen (z noci):\n{last['dream_text']}"
+        system += (" Na konci (po přehledu) mu krátce převyprávěj, co se ti v noci zdálo – 2–3 věty, ať to má "
+                   "šťávu, začni třeba „Jo a v noci se mi zdálo…“.")
+    text = llm.generate(system, ctx, temperature=0.8, patient=False).strip()
     if not text:
         raise RuntimeError("empty brief")
     return _deliver(user, "brief", today.isoformat(), f"Ráno – {DAYS[today.weekday()]} {today.day}. {today.month}.", text)
